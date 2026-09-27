@@ -66,6 +66,11 @@ jobs:
         run: |
           ./tools/development/build-gecko.sh
 
+      - name: Check GeckoView headers were exported
+        shell: bash
+        run: |
+          ls -la "$GECKO_OBJ/dist/include/GeckoView/" || echo "GeckoView export dir missing"
+
       - name: Package Gecko build
         shell: bash
         run: |
