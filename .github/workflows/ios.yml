@@ -60,11 +60,7 @@ jobs:
           find "$root_dir/patches" -type f -name '*.patch' -print | sort | while IFS= read -r patch_file; do
             git -C engine/firefox apply --3way --whitespace=nowarn "$patch_file"
           done
-      - name: Check GeckoView headers were exported
-        shell: bash
-         run: |
-         ls -la "$GECKO_OBJ/dist/include/GeckoView/" || echo "GeckoView export dir missing"
-
+          
       - name: Build Gecko
         shell: bash
         run: |
