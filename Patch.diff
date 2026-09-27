@@ -1,0 +1,14 @@
+--- a/.github/workflows/ios.yml
++++ b/.github/workflows/ios.yml
+@@ -64,6 +64,11 @@
+       - name: Build Gecko
+         shell: bash
+         run: |
+           ./tools/development/build-gecko.sh
+ 
++      - name: Check GeckoView headers were exported
++        shell: bash
++        run: |
++          ls -la "$GECKO_OBJ/dist/include/GeckoView/" || echo "GeckoView export dir missing"
++
+       - name: Package Gecko build
