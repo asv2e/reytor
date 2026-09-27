@@ -24,7 +24,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
     // MARK: - State
     
     let sessionManager = SessionManager()
-    lazy var tabManager: TabManager = TabManagerImplementation(
+    lazy var tabManager = TabManagerImplementation(
         delegate: self,
         sessionManager: sessionManager
     )
@@ -169,7 +169,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         browserChrome.syncSidebarButton(splitViewController: splitViewController)
         applyUpdateMenuButtonBadge()
         
-        tabManager.createInitialTab(openingScreen: Prefs.HomepageSettings.openingScreen)
+        tabManager.createInitialTab()
         refreshAddressBar()
         homepageOverlayCoordinator.updatePresentation(animated: false)
         
@@ -251,6 +251,9 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
     
     override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
+        if let readerSettings = presentedViewController as? ReaderSettingsViewController {
+            readerSettings.dismiss(animated: false)
+        }
         performContentLifecycle {
             toolbarController.reset(animated: false)
             coordinator.animate { _ in
@@ -422,7 +425,25 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
             self.presentShareSheet(
                 items: [url],
                 sourceView: sourceView,
-                sourceRect: sourceView.bounds
+                sourceRect: sourceView.bounds,
+                applicationActivities: [
+                    BookmarkActivity(url: url),
+                    AddToFavoritesActivity(url: url),
+                    FindInPageActivity(url: url),
+                    PagePrintActivity(session: tab.session, jobName: tab.title)
+                ],
+                onActivityPerformed: { [weak self] activityType in
+                    guard let self else {
+                        return
+                    }
+                    if activityType == BookmarkActivity.identifier {
+                        self.presentBookmarkEditor(addToFavorites: false)
+                    } else if activityType == AddToFavoritesActivity.identifier {
+                        self.presentBookmarkEditor(addToFavorites: true)
+                    } else if activityType == FindInPageActivity.identifier {
+                        self.browserChrome.showActionBar(.findInPage, animated: true)
+                    }
+                }
             )
         }
         browserChrome.onLibrary = { [weak self] in
@@ -498,6 +519,9 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         let previousLayout = browserLayout
         browserLayout = resolveBrowserLayout()
         if browserLayout != previousLayout {
+            if let readerSettings = presentedViewController as? ReaderSettingsViewController {
+                readerSettings.dismiss(animated: false)
+            }
             dismissAddressBarEditingAndOverlays()
         }
         applyBrowserLayout(animated: animated)
@@ -996,16 +1020,16 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         }
         
         browserChrome.updateNavigation(
-            canGoBack: tab.state.navigationState.canGoBack,
+            canGoBack: tabManager.canGoBack,
             canGoForward: tab.state.navigationState.canGoForward,
             canShare: tabManager.shareableURL(for: tab) != nil
         )
         
         let previewImages = tabManager.navigationPreviewImages(for: tab)
         contentView.setHistoryNavigation(
-            canGoBack: tab.state.navigationState.canGoBack,
+            canGoBack: tabManager.canGoBack,
             canGoForward: tab.state.navigationState.canGoForward,
-            backPreviewImage: previewImages.backImage,
+            backPreviewImage: tab.state.navigationState.canGoBack ? previewImages.backImage : nil,
             forwardPreviewImage: previewImages.forwardImage,
             isSwipeEnabled: true
         )
@@ -1203,7 +1227,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
             return
         }
         
-        tabManager.selectedTab?.session.notifyScreenOrientationChanged(to: interfaceOrientation)
+        sidebarCoordinator.notifyScreenOrientationChanged(to: interfaceOrientation)
         completePendingOrientationRequestIfSatisfied()
     }
     

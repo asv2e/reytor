@@ -39,11 +39,49 @@ extension BrowserViewController: AddressBarDelegate, AddressBarGestureDelegate {
         }
         browserChrome.updateAddressBarMenu(
             url: selectedURL,
-            usesDesktopWebsite: usesDesktopWebsite
+            usesDesktopWebsite: usesDesktopWebsite,
+            readerMode: selectedTab?.state.readerMode ?? ReaderModeState()
+        )
+        
+        refreshAddressBarAudioButton()
+    }
+    
+    func refreshAddressBarAudioButton() {
+        let selectedTab = tabManager.selectedTab
+        let playingTabs = tabsPlayingAudio
+        browserChrome.updateAddressBarAudioButton(
+            isVisible: !playingTabs.isEmpty,
+            isMuted: selectedTab?.isMuted == true ||
+            (!playingTabs.isEmpty && playingTabs.allSatisfy(\.isMuted))
         )
     }
     
+    private var tabsPlayingAudio: [Tab] {
+        return tabManager.activeTabs.filter { $0.state.isPlayingAudio }
+    }
+    
     // MARK: - AddressBarDelegate
+    
+    func addressBarAudioMenuState(_ addressBar: AddressBar) -> AddressBarMenu.AudioState? {
+        let playingTabs = tabsPlayingAudio
+        guard !playingTabs.isEmpty else {
+            return nil
+        }
+        let selectedTab = tabManager.selectedTab
+        return AddressBarMenu.AudioState(
+            playingTabs: playingTabs.map { tab in
+                let title = tab.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                return AddressBarMenu.AudioTabItem(
+                    id: tab.id,
+                    title: title.isEmpty ? tab.url ?? NSLocalizedString("Untitled", comment: "") : title,
+                    favicon: tab.favicon,
+                    isMuted: tab.isMuted
+                )
+            },
+            selectedTabID: selectedTab?.id,
+            isSelectedTabMuted: selectedTab?.isMuted ?? false
+        )
+    }
     
     func addressBarDidRequestReloadOrStop(_ addressBar: AddressBar) {
         if tabManager.selectedTab?.session.isOpen() == false {
@@ -61,6 +99,20 @@ extension BrowserViewController: AddressBarDelegate, AddressBarGestureDelegate {
         }
         
         tabManager.hardReloadSelectedTab()
+    }
+    
+    func addressBar(_ addressBar: AddressBar, didSelectAudioAction action: AddressBarMenu.AudioAction) {
+        switch action {
+        case let .selectTab(tabID):
+            guard let index = tabManager.activeTabs.firstIndex(where: { $0.id == tabID }) else {
+                return
+            }
+            tabManager.selectTab(at: index, mode: tabManager.selectedTabMode)
+        case let .setMuted(tabID, muted):
+            tabManager.setMuted(muted, for: tabID)
+        case let .muteOtherTabs(excluding: tabID):
+            tabManager.muteOtherPlayingTabs(excluding: tabID)
+        }
     }
     
     func addressBarAddonItems(_ addressBar: AddressBar) -> [AddressBarMenu.AddonItem] {
@@ -82,6 +134,43 @@ extension BrowserViewController: AddressBarDelegate, AddressBarGestureDelegate {
         }
         
         browserChrome.showActionBar(.findInPage, animated: true)
+    }
+    
+    func addressBarDidRequestReader(_ addressBar: AddressBar) {
+        guard let tab = tabManager.selectedTab else { return }
+        guard tab.state.readerMode.isActive else {
+            _ = tabManager.readerMode.enter(in: tab)
+            return
+        }
+        
+        let controller = ReaderSettingsViewController(
+            tabID: tab.id,
+            tabManager: tabManager,
+            readerMode: tabManager.readerMode
+        )
+        controller.onFindInPage = { [weak self] in
+            guard let self, self.tabManager.selectedTab === tab else { return }
+            self.browserChrome.showActionBar(.findInPage, animated: true)
+        }
+        controller.configurePresentation(asPopover: browserLayout.chromeMode == .pad)
+        if controller.modalPresentationStyle == .pageSheet {
+            controller.onVisibilityChanged = { [weak self] visible in
+                guard let self else { return }
+                if visible {
+                    self.toolbarController.collapseBottomToolbar()
+                } else if !self.browserChrome.isShowingFindInPage {
+                    self.toolbarController.restoreBottomToolbar()
+                }
+            }
+        }
+        if let popover = controller.popoverPresentationController {
+            let sourceButton = browserChrome.addressBarButton
+            popover.sourceView = sourceButton
+            popover.sourceRect = sourceButton.bounds
+            popover.permittedArrowDirections = [.up, .down]
+            popover.delegate = controller
+        }
+        present(controller, animated: true)
     }
     
     func addressBarDidRequestPageZoom(_ addressBar: AddressBar) {

@@ -59,7 +59,7 @@ Reytor is available as a standard build, a TrollStore build[^2], and a jailbroke
 [^3]: The jailbroken build provides automatic JIT enablement and better performance.
 
 > [!NOTE]
-> Although jailbroken builds are available, using Reytor in a jailbroken environment is not recommended. Tweaks and other system modifications may affect the browser's performance, stability, or functionality, and issues resulting from them may receive limited support.
+> Although jailbroken builds are available, using Reytor in a jailbroken environment is not recommended. Tweaks and other system modifications may affect the browser's performance, stability, or functionality, and issues resulting from them may receive limited support. **On any jailbroken device**, disable tweak injection for Reytor and its extensions using tools such as [Choicy](https://github.com/opa334/Choicy).
 
 **For AltStore or SideStore installations:**
 
@@ -68,17 +68,11 @@ Make sure to select **Keep App Extensions** during installation, as Reytor will 
 You can also [click here](https://altdirect.app/?url=https://github.com/asv2e/Reytor/releases/latest/download/source.json&exclude=livecontainer,stikstore,trollapps,feather) to add the AltSource for Reytor to AltStore or SideStore.
 
 > [!IMPORTANT]
-> - **LiveContainer is not supported** due to not supporting app extensions
-> - Sideloading using a distribution certificate for signing are **not supported**.⁠
-> - Other sideloading methods may be **incompatible with Reytor**, and **no support will be provided** for issues arising from them.
-
-> [!IMPORTANT]
-> - **LiveContainer is not supported** due to not supporting app extensions
-> - Sideloading using a distribution certificate for signing are **not supported**.⁠
+> - **LiveContainer is not supported** due to not supporting app extensions.
+> - Sideloading using a distribution certificate for signing is **not supported**.⁠
 > - Other sideloading methods may be **incompatible with Reytor**, and **no support will be provided** for issues arising from them.
 
 ## Preview
-
 ### iOS 14 (iPhone 6S Plus, 14.1)
 
 These sites are known to break or render incorrectly on iOS 14. The screenshots below compare how they load in Safari versus Reytor.
@@ -165,12 +159,6 @@ Reytor also works great on the latest version of iOS!
   </tr>
 </table>
 
-<<<<<<< HEAD
-## Development
-
-If you’ve come across this repository and find it interesting, I’d love to get help or collaborate on it. I’m learning as I go here and don’t have much prior experience with iOS app development or with Gecko itself, so any contributions, feedback, or pointers would be greatly appreciated.
-
-=======
 ## Building
 
 > [!WARNING]

@@ -88,8 +88,8 @@ final class SiteSettingsStore {
     
     // MARK: - Settings
     
-    func settings(for url: URL) -> SiteSettingsRecord? {
-        guard let host = URLUtils.normalizedHost(url.host) else {
+    func settings(for host: String) -> SiteSettingsRecord? {
+        guard let host = URLUtils.normalizedHost(host) else {
             return nil
         }
         
@@ -128,9 +128,9 @@ final class SiteSettingsStore {
         }
     }
     
-    func setPageZoom(_ value: Int, for url: URL) -> Bool {
+    func setPageZoom(_ value: Int, for host: String) -> Bool {
         guard Constants.pageZoomRange.contains(value),
-              let host = URLUtils.normalizedHost(url.host) else {
+              let host = URLUtils.normalizedHost(host) else {
             return false
         }
         
@@ -153,17 +153,17 @@ final class SiteSettingsStore {
         }
     }
     
-    func setReaderMode(_ enabled: Bool, for url: URL) -> Bool {
-        guard let host = URLUtils.normalizedHost(url.host) else {
+    func setReaderMode(_ enabled: Bool, for host: String) -> Bool {
+        guard let host = URLUtils.normalizedHost(host) else {
             return false
         }
         
         return stateQueue.sync {
-            if !enabled {
+            if enabled == Prefs.BrowsingSettings.useReaderAutomatically {
                 return clearSettingLocked(.readerMode, for: host)
             }
             
-            return setIntSettingLocked(1, column: .readerMode, for: host)
+            return setIntSettingLocked(enabled ? 1 : 0, column: .readerMode, for: host)
         }
     }
     
@@ -210,22 +210,7 @@ final class SiteSettingsStore {
         }
     }
     
-    func setPageZoom(_ value: Int, forHost host: String) -> Bool {
-        guard Constants.pageZoomRange.contains(value),
-              let host = URLUtils.normalizedHost(host) else {
-            return false
-        }
-        
-        return stateQueue.sync {
-            if value == Prefs.BrowsingSettings.defaultPageZoomLevel {
-                return clearSettingLocked(.pageZoom, for: host)
-            }
-            
-            return setIntSettingLocked(value, column: .pageZoom, for: host)
-        }
-    }
-    
-    func clearPageZoom(forHost host: String) -> Bool {
+    func clearPageZoom(for host: String) -> Bool {
         guard let host = URLUtils.normalizedHost(host) else {
             return false
         }
@@ -245,8 +230,8 @@ final class SiteSettingsStore {
         }
     }
     
-    func clearReaderMode(for url: URL) -> Bool {
-        guard let host = URLUtils.normalizedHost(url.host) else {
+    func clearReaderMode(for host: String) -> Bool {
+        guard let host = URLUtils.normalizedHost(host) else {
             return false
         }
         
@@ -255,8 +240,8 @@ final class SiteSettingsStore {
         }
     }
     
-    func clearSettings(for url: URL) -> Bool {
-        guard let host = URLUtils.normalizedHost(url.host) else {
+    func clearSettings(for host: String) -> Bool {
+        guard let host = URLUtils.normalizedHost(host) else {
             return false
         }
         
@@ -274,6 +259,12 @@ final class SiteSettingsStore {
     func clearAllPageZoomSettings() -> Bool {
         return stateQueue.sync {
             clearAllSettingsLocked(column: .pageZoom)
+        }
+    }
+    
+    func clearAllReaderModeSettings() -> Bool {
+        return stateQueue.sync {
+            clearAllSettingsLocked(column: .readerMode)
         }
     }
     

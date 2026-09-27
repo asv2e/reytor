@@ -1,8 +1,8 @@
 diff --git a/widget/uikit/moz.build b/widget/uikit/moz.build
-index f5d8821773c0..37c5fcbd1413 100644
+index f5d8821773c0..4ddd530d3293 100644
 --- a/widget/uikit/moz.build
 +++ b/widget/uikit/moz.build
-@@ -8,35 +8,55 @@ with Files("**"):
+@@ -8,35 +8,59 @@ with Files("**"):
  with Files("*TextInput*"):
      BUG_COMPONENT = ("Core", "DOM: UI Events & Focus Handling")
  
@@ -38,16 +38,20 @@ index f5d8821773c0..37c5fcbd1413 100644
 +    "ExternalResponseService.mm",
 +    "GeckoEditableSupport.mm",
 +    "GeckoKeyboardSupport.mm",
++    "GeckoPencilSupport.mm",
 +    "GeckoPointerSupport.mm",
 +    "GeckoTouchSupport.mm",
++    "GeckoViewPrintSupport.mm",
      "GfxInfo.cpp",
      "IOSBridge.mm",
      "MediaKeysEventSourceFactory.cpp",
      "nsAppShell.mm",
      "nsBidiKeyboard.mm",
 +    "nsClipboard.mm",
++    "nsDeviceContextUIKit.mm",
      "nsLookAndFeel.mm",
      "nsNativeThemeUIKit.mm",
++    "nsPrintSettingsServiceUIKit.mm",
      "nsUserIdleServiceUIKit.cpp",
      "nsWidgetFactory.mm",
      "nsWindow.mm",
@@ -58,3 +62,10 @@ index f5d8821773c0..37c5fcbd1413 100644
      "UIKitUtils.mm",
  ]
  
+@@ -55,5 +79,6 @@ XPCOM_MANIFESTS += [
+ ]
+ 
+ OS_LIBS += [
++    "-framework CoreGraphics",
+     "-framework UIKit",
+ ]

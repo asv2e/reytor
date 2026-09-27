@@ -147,11 +147,12 @@ final class AddonCoordinator: NSObject, AddonEmbedderDelegate {
     }
     
     private var menuAddons: [Addon] {
+        let installedAddons = AddonRuntime.shared.installedAddons.filter { !$0.isBuiltIn }
         guard dataSource?.isSelectedAddonTabPrivate == true else {
-            return AddonRuntime.shared.installedAddons
+            return installedAddons
         }
         
-        return AddonRuntime.shared.installedAddons.filter { $0.metaData.allowedInPrivateBrowsing }
+        return installedAddons.filter { $0.metaData.allowedInPrivateBrowsing }
     }
     
     // MARK: - Menu Actions
@@ -489,8 +490,10 @@ final class AddonCoordinator: NSObject, AddonEmbedderDelegate {
             presentation: isPopover ? .popover : .sheet
         )
         if !isPopover {
-            // Hack: Use .overFullScreen so GeckoView can scroll
-            popupViewController.modalPresentationStyle = .overFullScreen
+            if #unavailable(iOS 26.0) {
+                // Hack: Use .overFullScreen so GeckoView can scroll
+                popupViewController.modalPresentationStyle = .overFullScreen
+            }
             popupViewController.isModalInPresentation = true
         }
         delegate?.presentAddonViewController(self, popupViewController)
