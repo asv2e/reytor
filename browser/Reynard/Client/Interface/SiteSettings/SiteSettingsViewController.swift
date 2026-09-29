@@ -546,8 +546,6 @@ final class SiteSettingsViewController: UITableViewController, UINavigationContr
         _ = SiteSettingsStore.shared.setReaderMode(sender.isOn, for: host)
         session.reload()
     }
-        session.reload()
-    }
     
     @objc private func dismissModal() {
         dismiss(animated: true)
