@@ -77,9 +77,10 @@ jobs:
           set -euo pipefail
           test -d "$GECKO_OBJ/dist"
 
-          # dist/include entries are symlinks into engine/firefox sources, which
-          # don't exist (patched) in the iOS job. Replace them with real files.
-          find "$GECKO_OBJ/dist/include" -type l | while IFS= read -r link; do
+          # dist entries (headers in dist/include, resources in dist/bin) are
+          # symlinks into engine/firefox sources, which don't exist (patched)
+          # in the iOS job. Replace them with real files.
+          find "$GECKO_OBJ/dist" -type l | while IFS= read -r link; do
             if [[ -e "$link" ]]; then
               cp -L "$link" "$link.tmp" && mv -f "$link.tmp" "$link"
             fi
