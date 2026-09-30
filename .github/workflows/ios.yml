@@ -124,7 +124,7 @@ jobs:
           xcode-version: '26.6'
 
       - name: Install native build dependencies
-        run: brew install cmake nasm yasm pkg-config
+        run: brew install cmake nasm yasm pkg-config ldid
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
