@@ -107,6 +107,8 @@ jobs:
     needs: gecko-build
     runs-on: macos-26
     timeout-minutes: 360
+    permissions:
+      contents: write
 
     env:
       XCODE_PROJECT: browser/Reynard.xcodeproj
