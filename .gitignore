@@ -37,7 +37,7 @@ __pycache__/
 # Node / package manager
 node_modules/
 
-# Firefox / Gecko build artifacts
+# Firefox / Gecko build artifacts (expanded from upstream gecko.gitignore)
 *~
 *.orig
 *.rej
@@ -49,6 +49,15 @@ node_modules/
 compile_commands.json
 .eslintcache
 .fuse_hidden*
+[#]*#
+.#*
+ID
+!id/
+*.egg-info
+!third_party/python/**/*.egg-info
+!testing/web-platform/tests/tools/third_party/**/*.egg-info
+!third_party/rust/**/Cargo.toml.orig
+!third_party/rust/**/.*
 /.clang-tidy
 /.clangd
 /.clang_complete
@@ -56,24 +65,47 @@ compile_commands.json
 /mozconfig*
 /.machrc
 /machrc
+/.moz-vendoring
+/old-configure
 /config.cache
 /config.log
+/.clang_complete
+/.skip_fails_cache
+/.python-version
+/.nss.checkout
 /gecko.log
 /obj*/
 **/obj*/
-/.skip_fails_cache
-/.python-version
-/.gradle/
-/.kotlin/
-/local.properties
+/haz-*/
+build/reports/
+*_DBG.OBJ/
+*_OPT.OBJ/
+/js/src/*-obj/
+/js/src/obj-*/
+/js/src/old-configure
+/js/src/autom4te.cache
+/.svn/
+**/.svn/
+**/.dir-locals.el
+**/.projectile
 /.project
 /.cproject
 /.settings/
 /**/.settings/
-/.svn/
-**/.svn/
 **/.idea/
 *.iml
+/.gradle/
+/.kotlin/
+/local.properties
+/.captures/
+/captures/
+/node_modules/
+**/node_modules/
+/.eslintcache
+/.npmrc
+/.cargo/
+/.rustup/
+/.vscode/
 
 # GitHub Actions runtime
 .github/actions/
