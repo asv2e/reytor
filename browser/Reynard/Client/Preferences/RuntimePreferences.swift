@@ -10,6 +10,11 @@ import GeckoView
 
 enum RuntimePreferences {
     static func apply() {
+        // Tor is mandatory but doesn't connect by itself: apply the
+        // fail-closed proxy prefs and leave the network blocked until the
+        // user chooses to connect or configure bridges.
+        TorController.shared.applyStartupState()
+        
         // On sites with heavy graphics, the GPU process would crash
         // multiple times during user interactions on the iPad Air 2.
         // I originally thought this is due to OOM, but it turns out
@@ -51,6 +56,9 @@ enum RuntimePreferences {
         // HTTPS-only mode
         HTTPSOnlyModePolicyController.applyHTTPSOnlyMode()
         
+        // Native (non-Gecko) requests must never bypass Tor.
+        TorNativeNetworkGuard.install()
+
         // DNS over HTTPS
         DNSOverHTTPSPolicyController.applyDNSOverHTTPS()
         
@@ -63,11 +71,6 @@ enum RuntimePreferences {
         
         // Website Isolation
         WebsiteIsolationPolicyController.applyWebsiteIsolation()
-        
-        // Tor - starts bootstrapping asynchronously if the user had it
-        // enabled last session; applies fail-closed proxy prefs immediately
-        // so nothing leaks direct while that bootstrap is in flight.
-        TorController.shared.applyStartupState()
         
         // Remote Debugging
         RemoteDebuggingSettingController.applyRemoteDebugging()

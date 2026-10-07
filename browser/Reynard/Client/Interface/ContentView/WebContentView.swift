@@ -39,6 +39,9 @@ final class WebContentView: UIView, UIScrollViewDelegate {
     private var awaitsScrollInteraction = true
     private var pageBackgroundTopConstraint: NSLayoutConstraint?
     private var pageBackgroundBottomConstraint: NSLayoutConstraint?
+    private var webViewLeadingConstraint: NSLayoutConstraint?
+    private var webViewTrailingConstraint: NSLayoutConstraint?
+    private var webViewBottomConstraint: NSLayoutConstraint?
     
     private let webView = GeckoView()
     private let pageBackgroundView = UIView()
@@ -59,6 +62,12 @@ final class WebContentView: UIView, UIScrollViewDelegate {
         configureHierarchy()
         configureConstraints()
         applyVisibility()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(fingerprintingProtectionDidChange),
+            name: .fingerprintingProtectionDidChange,
+            object: nil
+        )
     }
     
     required init?(coder: NSCoder) {
@@ -66,10 +75,43 @@ final class WebContentView: UIView, UIScrollViewDelegate {
     }
     
     deinit {
+        NotificationCenter.default.removeObserver(self)
         webView.interactionDelegate = nil
     }
     
+    @objc private func fingerprintingProtectionDidChange() {
+        DispatchQueue.main.async { [weak self] in
+            self?.setNeedsLayout()
+        }
+    }
+    
+    /// Letterboxing: shrinks the Gecko view to a standard size bucket,
+    /// centered horizontally and anchored to the top, leaving blank margins
+    /// on the sides and bottom. Gecko then only ever sees bucketed
+    /// window dimensions.
+    private func updateLetterboxing() {
+        var horizontalInset: CGFloat = 0
+        var bottomInset: CGFloat = 0
+        if FingerprintingProtectionPolicyController.isLetterboxingActive,
+           bounds.width > 1, bounds.height > 1 {
+            let size = FingerprintingProtectionPolicyController.letterboxedSize(for: bounds.size)
+            horizontalInset = ((bounds.width - size.width) / 2).rounded(.down)
+            bottomInset = bounds.height - size.height
+        }
+        
+        if webViewLeadingConstraint?.constant != horizontalInset {
+            webViewLeadingConstraint?.constant = horizontalInset
+        }
+        if webViewTrailingConstraint?.constant != -horizontalInset {
+            webViewTrailingConstraint?.constant = -horizontalInset
+        }
+        if webViewBottomConstraint?.constant != -bottomInset {
+            webViewBottomConstraint?.constant = -bottomInset
+        }
+    }
+    
     override func layoutSubviews() {
+        updateLetterboxing()
         super.layoutSubviews()
         scrollToTopTriggerView.contentSize = CGSize(
             width: bounds.width,
@@ -134,9 +176,6 @@ final class WebContentView: UIView, UIScrollViewDelegate {
             pageBackgroundView.trailingAnchor.constraint(equalTo: trailingAnchor),
             
             webView.topAnchor.constraint(equalTo: topAnchor),
-            webView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            webView.bottomAnchor.constraint(equalTo: bottomAnchor),
             
             errorLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: UX.errorTopInset),
             errorLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
@@ -160,6 +199,16 @@ final class WebContentView: UIView, UIScrollViewDelegate {
             refreshIndicator.trailingAnchor.constraint(equalTo: refreshIndicatorContainer.trailingAnchor),
             refreshIndicator.bottomAnchor.constraint(equalTo: refreshIndicatorContainer.bottomAnchor),
         ])
+        
+        // Insets are adjusted by updateLetterboxing(); all zero when
+        // letterboxing is off.
+        let webViewLeading = webView.leadingAnchor.constraint(equalTo: leadingAnchor)
+        let webViewTrailing = webView.trailingAnchor.constraint(equalTo: trailingAnchor)
+        let webViewBottom = webView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        webViewLeadingConstraint = webViewLeading
+        webViewTrailingConstraint = webViewTrailing
+        webViewBottomConstraint = webViewBottom
+        NSLayoutConstraint.activate([webViewLeading, webViewTrailing, webViewBottom])
     }
     
     func extendPageBackground(

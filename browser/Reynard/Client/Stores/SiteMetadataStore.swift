@@ -62,7 +62,7 @@ final class SiteMetadataStore {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.timeoutIntervalForRequest = 8
         configuration.timeoutIntervalForResource = 15
-        return URLSession(configuration: configuration)
+        return URLSession(configuration: TorNativeNetworkGuard.guarded(configuration))
     }()
     
     private lazy var metaTagExpression = try! NSRegularExpression(

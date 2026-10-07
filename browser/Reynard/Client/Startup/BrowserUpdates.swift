@@ -23,43 +23,81 @@ final class BrowserUpdates: NSObject {
         let sideloadIPA = docs.appendingPathComponent("Reynard.ipa")
         try? FileManager.default.removeItem(at: sideloadIPA)
         
-        fetchUpdates()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(torConnectionStateDidChange),
+            name: .torConnectionStateDidChange,
+            object: nil
+        )
+        DispatchQueue.main.async { [weak self] in
+            self?.fetchUpdatesIfPossible()
+        }
     }
     
-    private func fetchUpdates() {
-        DispatchQueue.global(qos: .background).async {
-            guard let url = URL(string: Self.sourceURL),
-                  let data = try? Data(contentsOf: url) else { return }
-            
-            self.sourceData = data
-            
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let apps = json["apps"] as? [[String: Any]],
-                  let firstApp = apps.first,
-                  let versions = firstApp["versions"] as? [[String: Any]],
-                  let latestEntry = versions.first,
-                  let latestVersionStr = latestEntry["version"] as? String,
-                  let latestDateStr = latestEntry["date"] as? String else { return }
-            
-            let currentVersionStr = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0").replacingOccurrences(of: "-dev", with: "")
-            
-            let versionIsNewer = Self.isVersion(latestVersionStr, greaterThan: currentVersionStr)
-            guard versionIsNewer else { return }
-            
-            let formatter = ISO8601DateFormatter()
-            guard let latestDate = formatter.date(from: latestDateStr) else { return }
-            
-            if let currentEntry = versions.first(where: { ($0["version"] as? String) == currentVersionStr }),
-               let currentDateStr = currentEntry["date"] as? String,
-               let currentDate = formatter.date(from: currentDateStr) {
-                guard currentDate < latestDate else { return }
+    private var isFetching = false
+    private var hasFetched = false
+    
+    @objc private func torConnectionStateDidChange() {
+        DispatchQueue.main.async { [weak self] in
+            self?.fetchUpdatesIfPossible()
+        }
+    }
+    
+    private func fetchUpdatesIfPossible() {
+        guard !isFetching,
+              !hasFetched,
+              TorController.shared.state == .connected else {
+            return
+        }
+        
+        isFetching = true
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            guard let self,
+                  let url = URL(string: Self.sourceURL),
+                  let data = try? Data(contentsOf: url) else {
+                DispatchQueue.main.async {
+                    self?.isFetching = false
+                }
+                return
             }
             
+            self.processUpdateFeed(data)
             DispatchQueue.main.async {
-                self.hasUpdate = true
-                self.latestVersion = latestVersionStr
-                NotificationCenter.default.post(name: .appUpdateAvailable, object: nil)
+                self.isFetching = false
+                self.hasFetched = true
             }
+        }
+    }
+    
+    private func processUpdateFeed(_ data: Data) {
+        self.sourceData = data
+        
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let apps = json["apps"] as? [[String: Any]],
+              let firstApp = apps.first,
+              let versions = firstApp["versions"] as? [[String: Any]],
+              let latestEntry = versions.first,
+              let latestVersionStr = latestEntry["version"] as? String,
+              let latestDateStr = latestEntry["date"] as? String else { return }
+        
+        let currentVersionStr = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0").replacingOccurrences(of: "-dev", with: "")
+        
+        let versionIsNewer = Self.isVersion(latestVersionStr, greaterThan: currentVersionStr)
+        guard versionIsNewer else { return }
+        
+        let formatter = ISO8601DateFormatter()
+        guard let latestDate = formatter.date(from: latestDateStr) else { return }
+        
+        if let currentEntry = versions.first(where: { ($0["version"] as? String) == currentVersionStr }),
+           let currentDateStr = currentEntry["date"] as? String,
+           let currentDate = formatter.date(from: currentDateStr) {
+            guard currentDate < latestDate else { return }
+        }
+        
+        DispatchQueue.main.async {
+            self.hasUpdate = true
+            self.latestVersion = latestVersionStr
+            NotificationCenter.default.post(name: .appUpdateAvailable, object: nil)
         }
     }
     

@@ -1493,7 +1493,7 @@ extension TabManagerImplementation: ContentDelegate {
     }
     
     func onSavePdf(session: GeckoSession, request: SavePdfInfo) {
-        guard let download = DownloadStore.shared.pendingDownload(from: request) else {
+        guard let download = DownloadStore.shared.pendingDownload(from: request, session: session) else {
             return
         }
         

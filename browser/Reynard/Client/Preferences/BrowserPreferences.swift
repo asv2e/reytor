@@ -166,8 +166,6 @@ final class BrowserPreferences {
             key("FingerprintingProtection", "spoofsAcceptLanguage"): true,
             
             // Tor
-            key("Tor", "enabled"): false,
-            key("Tor", "blocksNetworkUntilConnected"): true,
             key("Tor", "usesBridges"): false,
             
             // JavaScript
@@ -666,18 +664,10 @@ final class BrowserPreferences {
 
     // MARK: - Tor
     struct TorPreferences {
-        static var enabled: Bool {
-            get { return prefs.bool(forSetting: "Tor", key: "enabled") }
-            set { prefs.set(newValue, forSetting: "Tor", key: "enabled") }
-        }
-        
-        // Kept fail-closed by default: while Tor is enabled but not yet
-        // connected (or if it errors out), network requests are blocked
-        // instead of silently falling back to a direct connection.
-        static var blocksNetworkUntilConnected: Bool {
-            get { return prefs.bool(forSetting: "Tor", key: "blocksNetworkUntilConnected") }
-            set { prefs.set(newValue, forSetting: "Tor", key: "blocksNetworkUntilConnected") }
-        }
+        // Like Tor Browser, all traffic is always routed through Tor and
+        // this can't be turned off. Until Tor is connected (or if it
+        // errors out) every request is blocked rather than sent directly.
+        static var enabled: Bool { true }
         
         // Only plain (non-pluggable-transport) bridge lines actually take
         // effect - see arti-ffi's Cargo.toml. Lines are stored newline-

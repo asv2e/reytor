@@ -37,5 +37,43 @@ __pycache__/
 # Node / package manager
 node_modules/
 
+# Firefox / Gecko build artifacts
+*~
+*.orig
+*.rej
+*.pdb
+*.gcda
+*.gcno
+*.gcov
+*.tsbuildinfo
+compile_commands.json
+.eslintcache
+.fuse_hidden*
+/.clang-tidy
+/.clangd
+/.clang_complete
+/.mozconfig*
+/mozconfig*
+/.machrc
+/machrc
+/config.cache
+/config.log
+/gecko.log
+/obj*/
+**/obj*/
+/.skip_fails_cache
+/.python-version
+/.gradle/
+/.kotlin/
+/local.properties
+/.project
+/.cproject
+/.settings/
+/**/.settings/
+/.svn/
+**/.svn/
+**/.idea/
+*.iml
+
 # GitHub Actions runtime
 .github/actions/

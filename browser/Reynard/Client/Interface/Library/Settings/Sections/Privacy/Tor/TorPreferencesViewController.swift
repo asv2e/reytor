@@ -10,16 +10,25 @@ import UIKit
 
 final class TorPreferencesViewController: SettingsTableViewController {
     private enum Row: CaseIterable, Equatable {
-        case enabled
         case status
+        case connect
+        case cancel
         case newCircuit
         case bridges
     }
     
-    private let torSwitch = UISwitch()
-    
     private var displayedRows: [Row] {
-        return Prefs.TorPreferences.enabled ? Row.allCases : [.enabled]
+        var rows: [Row] = [.status]
+        switch TorController.shared.state {
+        case .disabled, .failed:
+            rows.append(.connect)
+        case .bootstrapping:
+            rows.append(.cancel)
+        case .connected:
+            rows.append(.newCircuit)
+        }
+        rows.append(.bridges)
+        return rows
     }
     
     init() {
@@ -34,9 +43,6 @@ final class TorPreferencesViewController: SettingsTableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         navigationItem.largeTitleDisplayMode = .never
-        
-        torSwitch.isOn = Prefs.TorPreferences.enabled
-        torSwitch.addTarget(self, action: #selector(torSwitchDidChange), for: .valueChanged)
         
         NotificationCenter.default.addObserver(
             self,
@@ -61,7 +67,7 @@ final class TorPreferencesViewController: SettingsTableViewController {
     
     override func sectionText(for section: Int) -> SettingsSectionText {
         return SettingsSectionText(
-            footerTitle: NSLocalizedString("Routes your browsing through the Tor network for extra anonymity. Some sites may load more slowly, and a few may block Tor traffic entirely.", comment: "")
+            footerTitle: NSLocalizedString("All browsing is routed through the Tor network and this can't be turned off. Tor doesn't connect automatically: set up bridges first if your network blocks Tor, then tap Connect. Pages won't load until Tor is connected.", comment: "")
         )
     }
     
@@ -71,18 +77,16 @@ final class TorPreferencesViewController: SettingsTableViewController {
         }
         
         switch displayedRows[indexPath.row] {
-        case .enabled:
-            let cell = SettingsTableViewCell(style: .default, reuseIdentifier: nil)
-            cell.textLabel?.text = NSLocalizedString("Connect via Tor", comment: "")
-            cell.accessoryView = torSwitch
-            cell.selectionStyle = .none
-            return cell
         case .status:
             let cell = SettingsTableViewCell(style: .value1, reuseIdentifier: nil)
             cell.textLabel?.text = NSLocalizedString("Status", comment: "")
             cell.detailTextLabel?.text = statusDescription
             cell.selectionStyle = .none
             return cell
+        case .connect:
+            return SettingsViewUtils.actionCell(title: NSLocalizedString("Connect", comment: ""), tintColor: nil)
+        case .cancel:
+            return SettingsViewUtils.actionCell(title: NSLocalizedString("Cancel", comment: ""), tintColor: nil)
         case .newCircuit:
             return SettingsViewUtils.actionCell(title: NSLocalizedString("New Tor Circuit", comment: ""), tintColor: nil)
         case .bridges:
@@ -103,12 +107,16 @@ final class TorPreferencesViewController: SettingsTableViewController {
         }
         
         switch displayedRows[indexPath.row] {
+        case .connect:
+            TorController.shared.connect()
+        case .cancel:
+            TorController.shared.disconnect()
         case .newCircuit:
             TorController.shared.requestNewIdentity()
         case .bridges:
             let destination = TorBridgesPreferencesViewController()
             navigationController?.pushViewController(destination, animated: true)
-        case .enabled, .status:
+        case .status:
             break
         }
     }
@@ -126,38 +134,9 @@ final class TorPreferencesViewController: SettingsTableViewController {
         }
     }
     
-    @objc private func torSwitchDidChange(_ sender: UISwitch) {
-        TorController.shared.setEnabled(sender.isOn)
-        
-        let statusAndActionIndexPaths = [
-            IndexPath(row: 1, section: 0),
-            IndexPath(row: 2, section: 0),
-            IndexPath(row: 3, section: 0),
-        ]
-        tableView.performBatchUpdates {
-            if sender.isOn {
-                tableView.insertRows(at: statusAndActionIndexPaths, with: .automatic)
-            } else {
-                tableView.deleteRows(at: statusAndActionIndexPaths, with: .automatic)
-            }
-        }
-        
-        reloadOpenTabs()
-    }
-    
     @objc private func connectionStateDidChange() {
-        guard Prefs.TorPreferences.enabled, displayedRows.contains(.status) else {
-            return
-        }
-        tableView.reloadRows(at: [IndexPath(row: 1, section: 0)], with: .none)
-    }
-    
-    private func reloadOpenTabs() {
-        guard let browserViewController = LibrarySharedUtils.resolvedBrowserViewController(from: self) else {
-            return
-        }
-        for tab in browserViewController.tabManager.regularTabs + browserViewController.tabManager.privateTabs {
-            tab.session.reload()
+        DispatchQueue.main.async { [weak self] in
+            self?.tableView.reloadData()
         }
     }
 }

@@ -198,7 +198,7 @@ final class DownloadStore: NSObject {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.timeoutIntervalForRequest = 120
         configuration.timeoutIntervalForResource = 60 * 60
-        return URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
+        return URLSession(configuration: TorNativeNetworkGuard.guarded(configuration), delegate: self, delegateQueue: nil)
     }()
     
     private var activeDownloads: [Int: ActiveDownload] = [:]
@@ -280,7 +280,7 @@ final class DownloadStore: NSObject {
         )
     }
     
-    func pendingDownload(from request: SavePdfInfo) -> PendingDownload? {
+    func pendingDownload(from request: SavePdfInfo, session: GeckoSession) -> PendingDownload? {
         let candidateURLs = [request.url, request.originalUrl].compactMap { $0 }.compactMap(URL.init(string:))
         guard let sourceURL = candidateURLs.first(where: { URLUtils.isWebURL($0) }) else {
             return nil
@@ -292,12 +292,14 @@ final class DownloadStore: NSObject {
                 sourceURL: sourceURL,
                 mimeType: "application/pdf"
             ),
-            startHandler: { [weak self] in
-                self?.enqueueDownload(
+            startHandler: { [weak self, weak session] in
+                guard let self, let session else {
+                    return nil
+                }
+                self.startGeckoPDFDownload(
                     sourceURL: sourceURL,
-                    originalURL: URL(string: request.originalUrl ?? ""),
                     suggestedFileName: request.filename,
-                    mimeType: "application/pdf"
+                    session: session
                 )
                 return nil
             }
@@ -544,7 +546,7 @@ final class DownloadStore: NSObject {
         fileName: String,
         mimeType: String?,
         expectedBytes: Int64?,
-        controls: CapturedDownloadControls,
+        controls: CapturedDownloadControls?,
         originatingSession: GeckoSession
     ) {
         stateQueue.sync {
@@ -622,9 +624,57 @@ final class DownloadStore: NSObject {
             )
         }
     }
-    
+
+    // MARK: - Gecko-fetched PDF Downloads
+
+    /// Saves a PDF by having Gecko fetch it (through the proxy / Tor, with
+    /// the browser's own network settings) rather than re-downloading it
+    /// with a native URLSession, which would bypass Tor.
+    private func startGeckoPDFDownload(
+        sourceURL: URL,
+        suggestedFileName: String?,
+        session: GeckoSession
+    ) {
+        let fileName = resolvedFileName(
+            suggestedFileName: suggestedFileName,
+            sourceURL: sourceURL,
+            mimeType: "application/pdf"
+        )
+        let placeholderPath = fileManager.temporaryDirectory
+            .appendingPathComponent("PDF-\(UUID().uuidString)", isDirectory: false)
+            .path
+
+        beginCapturedDownload(
+            localFilePath: placeholderPath,
+            sourceURL: sourceURL,
+            fileName: fileName,
+            mimeType: "application/pdf",
+            expectedBytes: nil,
+            controls: nil,
+            originatingSession: session
+        )
+
+        Task { @MainActor [weak self, weak session] in
+            var succeeded = false
+            if let session,
+               let fetchedURL = try? await session.savePDF(from: sourceURL.absoluteString) {
+                let placeholderURL = URL(fileURLWithPath: placeholderPath)
+                do {
+                    try FileManager.default.moveItem(at: fetchedURL, to: placeholderURL)
+                    succeeded = true
+                } catch {
+                    try? FileManager.default.removeItem(at: fetchedURL)
+                }
+            }
+            self?.completeCapturedDownload(
+                localFilePath: placeholderPath,
+                succeeded: succeeded
+            )
+        }
+    }
+
     // MARK: - URL Session Downloads
-    
+
     private func enqueueDownload(
         sourceURL: URL,
         originalURL: URL?,

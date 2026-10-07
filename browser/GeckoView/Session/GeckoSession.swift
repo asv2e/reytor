@@ -448,6 +448,16 @@ public class GeckoSession {
         }
     }
     
+    /// Fetches a PDF through Gecko's own network stack (so it honours the
+    /// proxy / Tor prefs) into a temporary file and returns that file's URL.
+    @MainActor
+    public func savePDF(from sourceURL: String) async throws -> URL {
+        guard let window else {
+            throw GeckoHandlerError("session window is unavailable")
+        }
+        return try await savePDFDocument(from: sourceURL, using: window)
+    }
+
     @MainActor
     private func savePDFDocument(
         from sourceURL: String,

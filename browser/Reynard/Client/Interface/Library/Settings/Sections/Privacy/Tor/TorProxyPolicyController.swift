@@ -10,24 +10,12 @@ import GeckoView
 enum TorProxyPolicyController {
     // Nothing listens here, so pointing the proxy at it makes every
     // request fail fast instead of silently going out directly. Used
-    // while Tor is enabled but not yet connected (or has errored) and
-    // Prefs.TorPreferences.blocksNetworkUntilConnected is on.
+    // whenever Tor isn't connected (starting up, bootstrapping, errored,
+    // restarting). Tor is mandatory, so there is no "direct" state.
     private static let unreachablePort: UInt16 = 1
     
-    static func applyDisabled() {
-        GeckoRuntime.setDefaultPrefs([
-            "network.proxy.type": 0,
-        ])
-        
-        // Restore whatever DoH setting the user actually has configured -
-        // applyProxy() below overrides it with DoH forced off while Tor is
-        // active, and that override shouldn't stick around after Tor is
-        // turned off.
-        DNSOverHTTPSPolicyController.applyDNSOverHTTPS()
-    }
-    
-    static func applyConnecting(socksPort: UInt16, blocksNetworkUntilConnected: Bool) {
-        applyProxy(port: blocksNetworkUntilConnected ? unreachablePort : socksPort)
+    static func applyBlocked() {
+        applyProxy(port: unreachablePort)
     }
     
     static func applyConnected(socksPort: UInt16) {

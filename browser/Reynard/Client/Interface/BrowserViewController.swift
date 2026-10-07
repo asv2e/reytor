@@ -170,6 +170,9 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         applyUpdateMenuButtonBadge()
         
         tabManager.createInitialTab()
+        TorFetcher.sessionProvider = { [weak self] in
+            self?.tabManager.selectedTab?.session
+        }
         refreshAddressBar()
         homepageOverlayCoordinator.updatePresentation(animated: false)
         
@@ -217,6 +220,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
                 requestContentKeyboardFocus()
             }
         }
+        presentTorConnectPromptIfNeeded()
     }
     
     override func viewDidLayoutSubviews() {

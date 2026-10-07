@@ -32,8 +32,9 @@ final class UpdatesSettingsSection {
         return access(markerPath, F_OK) == 0
     }
     
-    private var activeUpdateTask: URLSessionDownloadTask?
-    private var updateProgressObservation: NSKeyValueObservation?
+    /// Identifies the in-flight update download so a cancelled one is
+    /// ignored when it finishes.
+    private var activeUpdateToken: UUID?
     
     func rowHeight(at index: Int, allowUpdate: Bool, in tableView: UITableView) -> CGFloat {
         let rows = displayedRows(allowUpdate: allowUpdate)
@@ -172,67 +173,53 @@ final class UpdatesSettingsSection {
             return
         }
         
-        let alert = UIAlertController(title: NSLocalizedString("Downloading Update", comment: ""), message: message, preferredStyle: .alert)
-        let progressView = UIProgressView(progressViewStyle: .default)
-        progressView.translatesAutoresizingMaskIntoConstraints = false
-        progressView.progress = 0
+        // Downloaded by Gecko so it goes through Tor like all other traffic;
+        // that API has no progress reporting or cancellation, so the alert
+        // is indeterminate and Cancel just discards the result.
+        let token = UUID()
+        activeUpdateToken = token
         
-        let session = URLSession(configuration: .default)
-        let task = session.downloadTask(with: url) { [weak self, weak viewController, weak alert] location, _, error in
-            DispatchQueue.main.async {
-                guard let self,
-                      let viewController,
-                      let alert else {
-                    return
+        let alert = UIAlertController(
+            title: NSLocalizedString("Downloading Update", comment: ""),
+            message: message + "\n\n" + NSLocalizedString("Downloading through Tor, this can take a few minutes.", comment: ""),
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel) { [weak self] _ in
+            self?.activeUpdateToken = nil
+        })
+        viewController.present(alert, animated: true)
+        
+        Task { @MainActor [weak self, weak viewController, weak alert] in
+            let result: Result<URL, Error>
+            do {
+                result = .success(try await TorFetcher.fetch(url))
+            } catch {
+                result = .failure(error)
+            }
+            
+            guard let self,
+                  self.activeUpdateToken == token,
+                  let viewController,
+                  let alert else {
+                if case .success(let location) = result {
+                    try? FileManager.default.removeItem(at: location)
                 }
-                
-                self.updateProgressObservation = nil
-                self.activeUpdateTask = nil
-                
-                if let error {
-                    let nsError = error as NSError
-                    guard nsError.domain != NSURLErrorDomain || nsError.code != NSURLErrorCancelled else {
-                        return
-                    }
-                    
-                    SettingsViewUtils.dismissPresentedAlert(alert, from: viewController) {
-                        AlertPresenter.show(title: NSLocalizedString("Download Failed", comment: ""), message: error.localizedDescription)
-                    }
-                    return
+                return
+            }
+            self.activeUpdateToken = nil
+            
+            switch result {
+            case .failure(let error):
+                SettingsViewUtils.dismissPresentedAlert(alert, from: viewController) {
+                    AlertPresenter.show(title: NSLocalizedString("Download Failed", comment: ""), message: error.localizedDescription)
                 }
-                
-                guard let location else {
-                    return
-                }
-                
+            case .success(let location):
                 try? FileManager.default.removeItem(at: destinationURL)
                 try? FileManager.default.moveItem(at: location, to: destinationURL)
                 SettingsViewUtils.dismissPresentedAlert(alert, from: viewController) {
                     self.shareDownloadedUpdate(at: destinationURL, from: viewController)
                 }
             }
-        }
-        activeUpdateTask = task
-        
-        alert.addAction(UIAlertAction(title: NSLocalizedString("Cancel", comment: ""), style: .cancel) { [weak self] _ in
-            self?.activeUpdateTask?.cancel()
-            self?.activeUpdateTask = nil
-            self?.updateProgressObservation = nil
-        })
-        
-        viewController.present(alert, animated: true) { [weak self, weak task] in
-            guard let self,
-                  let task else {
-                return
-            }
-            
-            SettingsViewUtils.addProgressView(progressView, to: alert)
-            self.updateProgressObservation = task.progress.observe(\.fractionCompleted, options: [.new]) { [weak progressView] progress, _ in
-                DispatchQueue.main.async {
-                    progressView?.setProgress(Float(progress.fractionCompleted), animated: true)
-                }
-            }
-            task.resume()
         }
     }
     

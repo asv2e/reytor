@@ -37,24 +37,28 @@ final class TorController {
     
     private init() {}
     
-    /// Called once at app startup (from RuntimePreferences) to pick up
-    /// whatever the user last had Tor set to.
+    /// Called once at app startup (from RuntimePreferences). Tor is
+    /// mandatory but doesn't connect on its own, so bridges can be set up
+    /// first; until the user connects, the proxy stays blocked.
     func applyStartupState() {
-        if Prefs.TorPreferences.enabled {
+        TorProxyPolicyController.applyBlocked()
+    }
+    
+    /// Starts Tor if it isn't already running or connecting.
+    func connect() {
+        switch state {
+        case .disabled, .failed:
             start()
-        } else {
-            state = .disabled
+        case .bootstrapping, .connected:
+            break
         }
     }
     
-    func setEnabled(_ enabled: Bool) {
-        guard enabled != Prefs.TorPreferences.enabled else { return }
-        Prefs.TorPreferences.enabled = enabled
-        if enabled {
-            start()
-        } else {
-            stop()
-        }
+    /// Stops Tor (e.g. to cancel a connection attempt and edit bridges).
+    /// Traffic stays blocked, it never falls back to direct.
+    func disconnect() {
+        guard state != .disabled else { return }
+        stop()
     }
     
     /// Tor-level half of "New Identity": discards the current client's
@@ -80,7 +84,7 @@ final class TorController {
     /// isn't currently enabled - the new config will simply be picked up
     /// next time it's turned on.
     func reconnect() {
-        guard Prefs.TorPreferences.enabled else { return }
+        guard state != .disabled else { return }
         stop()
         start()
     }
@@ -153,6 +157,9 @@ final class TorController {
     }
     
     private func handleEvent(kind: ArtiTorEventKind, percent: Int, message: String?) {
+        // Late events from a client that was just stopped/cancelled must
+        // not move us back to bootstrapping or connected.
+        guard state != .disabled else { return }
         switch kind {
         case .bootstrapProgress:
             state = .bootstrapping(percent: percent)
@@ -174,13 +181,8 @@ final class TorController {
     
     private func applyProxyForCurrentState() {
         switch state {
-        case .disabled:
-            TorProxyPolicyController.applyDisabled()
-        case .bootstrapping, .failed:
-            TorProxyPolicyController.applyConnecting(
-                socksPort: socksPort,
-                blocksNetworkUntilConnected: Prefs.TorPreferences.blocksNetworkUntilConnected
-            )
+        case .disabled, .bootstrapping, .failed:
+            TorProxyPolicyController.applyBlocked()
         case .connected:
             TorProxyPolicyController.applyConnected(socksPort: socksPort)
         }
