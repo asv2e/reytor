@@ -36,21 +36,7 @@ jobs:
 
       - name: Fetch Gecko source
         shell: bash
-        run: |
-          set -euo pipefail
-          firefox_tag="$(tr -d '\000\r' < engine/release.txt | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-
-          if git rev-parse --verify HEAD:engine/firefox >/dev/null 2>&1; then
-            git submodule update --init --depth 1 -- engine/firefox
-          elif [[ -d engine/firefox/.git ]]; then
-            git -C engine/firefox remote set-url origin https://github.com/mozilla-firefox/firefox
-          else
-            rm -rf engine/firefox
-            git clone --depth 1 --filter=blob:none https://github.com/mozilla-firefox/firefox engine/firefox
-          fi
-
-          git -C engine/firefox fetch --depth 1 origin tag "$firefox_tag"
-          git -C engine/firefox checkout --detach "$firefox_tag^{commit}"
+        run: ./tools/development/update-gecko.sh
 
       - name: Apply Gecko patches
         shell: bash

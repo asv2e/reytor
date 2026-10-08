@@ -111,7 +111,6 @@ jobs:
         run: |
           git submodule sync --recursive
           git submodule update --init --recursive support/idevice
-          git submodule update --init --depth 1 engine/firefox
 
       - name: Update Gecko source
         run: ./tools/development/update-gecko.sh

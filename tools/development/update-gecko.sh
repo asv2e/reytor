@@ -41,13 +41,7 @@ fi
 TAG_REF="refs/tags/$RELEASE_TAG"
 
 echo "Updating Gecko checkout at $SUBMODULE_PATH"
-if git rev-parse --verify HEAD:"$SUBMODULE_PATH" >/dev/null 2>&1; then
-	git submodule set-url -- "$SUBMODULE_PATH" "$FIREFOX_URL"
-	git submodule sync -- "$SUBMODULE_PATH"
-	git submodule update --init --depth 1 -- "$SUBMODULE_PATH"
-else
-	git -C "$SUBMODULE_PATH" remote set-url origin "$FIREFOX_URL"
-fi
+git -C "$SUBMODULE_PATH" remote set-url origin "$FIREFOX_URL"
 
 echo "Fetching and checking out tag $RELEASE_TAG..."
 git -C "$SUBMODULE_PATH" fetch --depth 1 origin tag "$RELEASE_TAG"
