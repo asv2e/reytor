@@ -65,7 +65,9 @@ arti-client = { version = "=0.39.0", default-features = false, features = ["toki
 tor-rtcompat = { version = "=0.39.0", features = ["tokio", "rustls"] }
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "io-util", "sync", "time", "macros"] }
 futures = "0.3"
-libc = "0.2"
+# tor-llcrypto 0.39 pulls rand_jitter 0.5, which calls this on iOS.
+# libc 0.2.190 gates mach_absolute_time to macOS, breaking that build.
+libc = "=0.2.189"
 
 [profile.release]
 panic = "abort"
