@@ -1,16 +1,13 @@
 diff --git a/widget/uikit/GeckoViewSwiftSupport.h b/widget/uikit/GeckoViewSwiftSupport.h
-index e68fca9134c0..a468312fa5cd 100644
+index e68fca9134c0..8521be93523e 100644
 --- a/widget/uikit/GeckoViewSwiftSupport.h
 +++ b/widget/uikit/GeckoViewSwiftSupport.h
-@@ -17,15 +17,71 @@
- #  define MOZ_END_EXTERN_C
- #endif
- 
-+#import <AVFoundation/AVSampleBufferDisplayLayer.h>
- #import <Foundation/Foundation.h>
+@@ -21,11 +21,68 @@
  #import <UIKit/UIKit.h>
  #import <xpc/xpc.h>
  
++NS_ASSUME_NONNULL_BEGIN
++
  @protocol SwiftEventDispatcher;
  
 +typedef NS_ENUM(NSInteger, GeckoInputHandling) {
@@ -74,29 +71,59 @@ index e68fca9134c0..a468312fa5cd 100644
  @end
  
  @protocol GeckoProcessExtension <NSObject>
-@@ -55,8 +111,39 @@
+@@ -33,38 +90,71 @@
+ @end
+ 
+ @protocol EventCallback <NSObject>
+-- (void)sendSuccess:(id)response;
+-- (void)sendError:(id)response;
++- (void)sendSuccess:(nullable id)response;
++- (void)sendError:(nullable id)response;
+ @end
+ 
+ @protocol GeckoEventDispatcher <NSObject>
+ - (void)dispatchToGecko:(NSString*)type
+-                message:(id)message
+-               callback:(id<EventCallback>)callback;
++                message:(nullable id)message
++               callback:(nullable id<EventCallback>)callback;
+ - (BOOL)hasListener:(NSString*)type;
+ @end
+ 
+ @protocol SwiftEventDispatcher <NSObject>
+-- (void)attach:(id<GeckoEventDispatcher>)gecko;
++- (void)attach:(nullable id<GeckoEventDispatcher>)gecko;
+ - (void)dispatchToSwift:(NSString*)type
+-                message:(id)message
+-               callback:(id<EventCallback>)callback;
++                message:(nullable id)message
++               callback:(nullable id<EventCallback>)callback;
+ - (BOOL)hasListener:(NSString*)type;
+ // Called when GeckoView is ready to receive dispatched events from Swift.
+ - (void)activate;
  @end
  
  @protocol GeckoViewWindow <NSObject>
+-- (UIView*)view;
 +// Window
- - (UIView*)view;
++- (nullable UIView*)view;
  - (void)close;
 +
 +// Interaction
-+- (void)setInteractionDelegate:(id<GeckoViewInteractionDelegate>)delegate;
-+
-+// PiP
-+- (AVSampleBufferDisplayLayer*)pictureInPictureDisplayLayer;
++- (void)setInteractionDelegate:
++    (nullable id<GeckoViewInteractionDelegate>)delegate;
 +
 +// Layout
 +- (void)setDynamicToolbarMaxHeight:(CGFloat)height minHeight:(CGFloat)minHeight;
 +- (void)setContentOffsets:(CGFloat)top
 +                   bottom:(CGFloat)bottom
 +                 topInset:(CGFloat)topInset
-+              bottomInset:(CGFloat)bottomInset;
++              bottomInset:(CGFloat)bottomInset
++      contentTranslationY:(CGFloat)contentTranslationY;
 +- (void)updateScreenOrientation:(NSInteger)interfaceOrientation;
 +
 +// Keyboard
++- (void)dismissSoftwareKeyboard;
 +- (BOOL)focusForHardwareKeyboard;
 +- (BOOL)isInHardwareKeyboardMode;
 +
@@ -114,3 +141,14 @@ index e68fca9134c0..a468312fa5cd 100644
  @end
  
  MOZ_BEGIN_EXTERN_C
+ 
+ MOZ_EXPORT id<GeckoViewWindow> GeckoViewOpenWindow(
+-    NSString* aId, id<SwiftEventDispatcher> aDispatcher,
++    NSString* _Nullable aId, id<SwiftEventDispatcher> aDispatcher,
+     NSDictionary* aInitData, bool aPrivateMode);
+ 
+ MOZ_END_EXTERN_C
+ 
++NS_ASSUME_NONNULL_END
++
+ #endif /* GeckoView_GeckoViewSwiftSupport_h */

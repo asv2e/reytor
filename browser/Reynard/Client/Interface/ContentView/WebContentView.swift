@@ -152,8 +152,8 @@ final class WebContentView: UIView, UIScrollViewDelegate {
         refreshIndicatorContainer.addSubview(refreshIndicator)
         addSubview(scrollToTopTriggerView)
         addSubview(pageBackgroundView)
-        addSubview(refreshIndicatorContainer)
         addSubview(webView)
+        addSubview(refreshIndicatorContainer)
         addSubview(errorLabel)
         resetRefreshIndicator()
         refreshIndicatorContainer.alpha = 0
@@ -177,7 +177,6 @@ final class WebContentView: UIView, UIScrollViewDelegate {
             
             webView.topAnchor.constraint(equalTo: topAnchor),
             
-            errorLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: UX.errorTopInset),
             errorLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
             errorLabel.leadingAnchor.constraint(
                 greaterThanOrEqualTo: safeAreaLayoutGuide.leadingAnchor,
@@ -190,10 +189,6 @@ final class WebContentView: UIView, UIScrollViewDelegate {
             errorLabel.widthAnchor.constraint(lessThanOrEqualToConstant: UX.maximumErrorWidth),
             
             refreshIndicatorContainer.centerXAnchor.constraint(equalTo: centerXAnchor),
-            refreshIndicatorContainer.topAnchor.constraint(
-                equalTo: safeAreaLayoutGuide.topAnchor,
-                constant: (UX.refreshingContentOffset - refreshIndicator.intrinsicContentSize.height) / 2
-            ),
             refreshIndicator.topAnchor.constraint(equalTo: refreshIndicatorContainer.topAnchor),
             refreshIndicator.leadingAnchor.constraint(equalTo: refreshIndicatorContainer.leadingAnchor),
             refreshIndicator.trailingAnchor.constraint(equalTo: refreshIndicatorContainer.trailingAnchor),
@@ -209,6 +204,17 @@ final class WebContentView: UIView, UIScrollViewDelegate {
         webViewTrailingConstraint = webViewTrailing
         webViewBottomConstraint = webViewBottom
         NSLayoutConstraint.activate([webViewLeading, webViewTrailing, webViewBottom])
+    }
+
+    func positionErrorLabel(below topAnchor: NSLayoutYAxisAnchor) {
+        errorLabel.topAnchor.constraint(equalTo: topAnchor, constant: UX.errorTopInset).isActive = true
+    }
+
+    func positionRefreshIndicator(below topAnchor: NSLayoutYAxisAnchor) {
+        refreshIndicatorContainer.topAnchor.constraint(
+            equalTo: topAnchor,
+            constant: (UX.refreshingContentOffset - refreshIndicator.intrinsicContentSize.height) / 2
+        ).isActive = true
     }
     
     func extendPageBackground(

@@ -91,6 +91,8 @@ extension BrowserViewController: TabManagerDelegate {
            fullscreenSession !== selectedTab.session {
             applyFullscreenState(false, for: fullscreenSession, mediaIsPlaying: false)
         }
+        
+        requestHomepageAddressBarFocus()
     }
     
     func tabManager(_ tabManager: TabManager, didReplaceSelectedSession previousSession: GeckoSession, with replacementSession: GeckoSession) {
@@ -107,6 +109,14 @@ extension BrowserViewController: TabManagerDelegate {
     
     func tabManager(_ tabManager: TabManager, didRequestContentKeyboardFocusFor session: GeckoSession) {
         requestContentKeyboardFocus(for: session)
+    }
+    
+    func tabManager(_ tabManager: TabManager, didRequestFindInPage query: String, in session: GeckoSession) {
+        guard tabManager.selectedTab?.session === session else {
+            return
+        }
+        
+        browserChrome.showActionBar(.findInPage(query: query), animated: true)
     }
     
     func tabManager(_ tabManager: TabManager, captureHistoryThumbnailForTabAt index: Int, mode: TabMode, url: String) {
@@ -179,6 +189,7 @@ extension BrowserViewController: TabManagerDelegate {
                 browserChrome.updatePageZoomLevel(tab.session.settings.pageZoom.level)
                 updateNavigationButtons()
                 homepageOverlayCoordinator.updatePresentation(animated: true)
+                requestHomepageAddressBarFocus()
             }
             
         case .favicon:
@@ -337,7 +348,7 @@ extension BrowserViewController {
         }
         
         let targetTabID = targetTab.id
-        if homepageOverlayCoordinator.needsHomepageThumbnail(for: targetTab) {
+        if homepageOverlayCoordinator.isHomepageTab(targetTab) {
             homepageOverlayCoordinator.captureHomepageThumbnail(targetTab) { [weak self] thumbnail in
                 guard let self,
                       let thumbnail,
