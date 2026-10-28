@@ -156,6 +156,7 @@ jobs:
           CC: clang
           CXX: clang++
           LD: ld64.lld
+          MOZ_NOSPAM: "1"
         run: ./tools/development/build-gecko.sh ${{ matrix.build_args }}
 
       - name: Build idevice support library

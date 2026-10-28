@@ -331,8 +331,53 @@ public class GeckoSession {
         dispatcher.dispatch(type: "GeckoView:PurgeHistory")
     }
     
+    // MARK: - Full screen
+    
     public func exitFullScreen() {
         dispatcher.dispatch(type: "GeckoViewContent:ExitFullScreen")
+    }
+    
+    // MARK: - Error Pages
+    
+    public var currentLoadError: WebRequestError? {
+        return window?.errorPageURI().flatMap(WebRequestError.init(pageURI:))
+    }
+    
+    public func addCertException(for error: WebRequestError) -> Bool {
+        guard error.kind == .securityBadCertificate,
+              window?.addCertException(pageURI: error.pageURI) == true else {
+            return false
+        }
+        
+        reload()
+        return true
+    }
+    
+    public func reloadWithHttpsOnlyException(for error: WebRequestError) -> Bool {
+        guard error.kind == .httpsOnly else {
+            return false
+        }
+        
+        return window?.reloadWithHttpsOnlyException(pageURI: error.pageURI) == true
+    }
+    
+    // MARK: - Image Loading
+    
+    @MainActor
+    public func fetchImageData(from url: URL) async throws -> Data {
+        guard isOpen() else {
+            throw GeckoHandlerError("Session is closed")
+        }
+        
+        let response = try await dispatcher.query(
+            type: "GeckoView:FetchImage",
+            message: ["url": url.absoluteString]
+        )
+        guard let base64 = response as? String,
+              let data = Data(base64Encoded: base64) else {
+            throw GeckoHandlerError("Invalid image response")
+        }
+        return data
     }
     
     // MARK: - Find in Page
@@ -528,7 +573,7 @@ public class GeckoSession {
     public func dismissSoftwareKeyboard() {
         window?.dismissSoftwareKeyboard()
     }
-
+    
     public func focusedInputMetrics() async -> (bottomRatio: CGFloat, caretTop: CGFloat?)? {
         let response = try? await dispatcher.query(type: "GeckoView:GetFocusedInputMetrics")
         guard let values = response as? [AnyHashable: Any],

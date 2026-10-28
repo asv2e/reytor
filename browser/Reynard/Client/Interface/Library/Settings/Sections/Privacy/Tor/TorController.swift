@@ -22,10 +22,11 @@ enum TorConnectionState: Equatable {
 final class TorController {
     static let shared = TorController()
     
-    // Arbitrary local port for the embedded SOCKS forwarder. Not
-    // user-configurable since nothing outside this process ever connects
-    // to it.
-    private let socksPort: UInt16 = 19_050
+    // Local port for the embedded SOCKS forwarder. Picked at random for
+    // every start (not a well-known fixed value) so other apps on the
+    // device and web pages can't trivially find or squat on it. Nothing
+    // outside this process is meant to connect to it.
+    private var socksPort: UInt16 = 19_050
     
     private(set) var state: TorConnectionState = .disabled {
         didSet {
@@ -41,13 +42,20 @@ final class TorController {
     /// mandatory but doesn't connect on its own, so bridges can be set up
     /// first; until the user connects, the proxy stays blocked.
     func applyStartupState() {
-        TorProxyPolicyController.applyBlocked()
+        // Re-applied on every window's viewDidLoad, so reflect the real
+        // state instead of unconditionally blocking a live connection.
+        applyProxyForCurrentState()
     }
     
     /// Starts Tor if it isn't already running or connecting.
     func connect() {
         switch state {
-        case .disabled, .failed:
+        case .disabled:
+            start()
+        case .failed:
+            // A failed bootstrap leaves the old client registered; stop it
+            // so start() launches a fresh one instead of silently no-oping.
+            stop()
             start()
         case .bootstrapping, .connected:
             break
@@ -90,6 +98,7 @@ final class TorController {
     }
     
     private func start() {
+        socksPort = UInt16.random(in: 49_152...64_999)
         state = .bootstrapping(percent: 0)
         
         guard let directories = Self.prepareDirectories() else {
@@ -98,6 +107,12 @@ final class TorController {
         }
         
         let bridgeLines = Prefs.TorPreferences.usesBridges ? Prefs.TorPreferences.bridgeLines : ""
+        if Prefs.TorPreferences.usesBridges, !Self.containsBridgeLine(bridgeLines) {
+            // Never fall back to connecting without bridges when the user
+            // asked for them.
+            state = .failed(NSLocalizedString("Bridges are turned on but no bridge lines are configured.", comment: ""))
+            return
+        }
         let (obfs4Port, snowflakePort) = Self.startPluggableTransportsIfNeeded(for: bridgeLines)
         
         ArtiTorClient.shared.start(
@@ -117,6 +132,13 @@ final class TorController {
         PluggableTransportController.stopObfs4()
         PluggableTransportController.stopSnowflake()
         state = .disabled
+    }
+    
+    private static func containsBridgeLine(_ lines: String) -> Bool {
+        return lines.split(separator: "\n").contains { raw in
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            return !line.isEmpty && !line.hasPrefix("#")
+        }
     }
     
     /// Starts whichever of IPtProxy's transports the configured bridge
@@ -193,14 +215,27 @@ final class TorController {
         guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             return nil
         }
-        let stateURL = appSupport.appendingPathComponent("Tor/state", isDirectory: true)
-        let cacheURL = appSupport.appendingPathComponent("Tor/cache", isDirectory: true)
+        var rootURL = appSupport.appendingPathComponent("Tor", isDirectory: true)
+        let stateURL = rootURL.appendingPathComponent("state", isDirectory: true)
+        let cacheURL = rootURL.appendingPathComponent("cache", isDirectory: true)
         do {
             try fileManager.createDirectory(at: stateURL, withIntermediateDirectories: true)
             try fileManager.createDirectory(at: cacheURL, withIntermediateDirectories: true)
         } catch {
             return nil
         }
+        
+        // Guard/consensus state shouldn't leak into iCloud or iTunes backups
+        // (or get cloned onto another device), and should be encrypted at
+        // rest. "Until first user authentication" keeps it readable for
+        // background use after the first unlock.
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        try? rootURL.setResourceValues(resourceValues)
+        try? fileManager.setAttributes(
+            [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication],
+            ofItemAtPath: rootURL.path
+        )
         return (stateURL.path, cacheURL.path)
     }
 }

@@ -22,6 +22,7 @@ final class SelectionActionPresenter: SelectionActionPresenting {
     ) {
         self.onMenuDismissed = onMenuDismissed
         self.onFindInPage = onFindInPage
+        _ = Self.systemUIDismissalHook
     }
     
     func show(_ request: SelectionActionRequest, for session: GeckoSession) {
@@ -47,6 +48,27 @@ final class SelectionActionPresenter: SelectionActionPresenting {
     func hide(for session: GeckoSession) {
         existingMenuHost(for: session)?.hideMenu()
     }
+    
+    // MARK: - System UI Dismissal
+    
+    private static let systemUIDismissalHook: Void = {
+        let dismissSelector = NSSelectorFromString("sessionDidDismiss")
+        guard let serviceClass = NSClassFromString("_UITextServiceSession"),
+              let dismissMethod = class_getInstanceMethod(serviceClass, dismissSelector),
+              let sourceIvar = class_getInstanceVariable(serviceClass, "_contextView") else {
+            return
+        }
+        
+        typealias DismissService = @convention(c) (AnyObject, Selector) -> Void
+        let dismiss = unsafeBitCast(method_getImplementation(dismissMethod), to: DismissService.self)
+        
+        let dismissHook: @convention(block) (AnyObject) -> Void = { service in
+            let source = object_getIvar(service, sourceIvar)
+            dismiss(service, dismissSelector)
+            NotificationCenter.default.post(name: .selectionSystemUIDidDismiss, object: source)
+        }
+        method_setImplementation(dismissMethod, imp_implementationWithBlock(dismissHook))
+    }()
     
     // MARK: - Hosts
     

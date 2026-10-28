@@ -96,7 +96,9 @@ final class FaviconStore {
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         configuration.timeoutIntervalForRequest = 5
         configuration.timeoutIntervalForResource = 10
-        return URLSession(configuration: configuration)
+        // Native requests must never bypass Tor: the guard fails them
+        // instead of letting page URLs and favicon fetches leave directly.
+        return URLSession(configuration: TorNativeNetworkGuard.guarded(configuration))
     }()
     private lazy var metadataUserAgent: String = {
         let version = ProcessInfo.processInfo.operatingSystemVersion

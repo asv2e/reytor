@@ -1,9 +1,9 @@
 diff --git a/widget/uikit/GeckoKeyboardSupport.h b/widget/uikit/GeckoKeyboardSupport.h
 new file mode 100644
-index 000000000000..d33a843ca0bc
+index 000000000000..ad49c6ad800f
 --- /dev/null
 +++ b/widget/uikit/GeckoKeyboardSupport.h
-@@ -0,0 +1,124 @@
+@@ -0,0 +1,141 @@
 +/* This Source Code Form is subject to the terms of the Mozilla Public
 + * License, v. 2.0. If a copy of the MPL was not distributed with this
 + * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -21,6 +21,8 @@ index 000000000000..d33a843ca0bc
 +#include "mozilla/UniquePtr.h"
 +#include "nsStringFwd.h"
 +#include "nsTArray.h"
++
++@protocol GeckoViewKeyCommandDelegate;
 +
 +typedef NS_ENUM(NSInteger, WebEventType) {
 +  WebEventMouseDown,
@@ -60,6 +62,16 @@ index 000000000000..d33a843ca0bc
 +};
 +
 +@interface WebEvent : NSObject
++- (instancetype)initWithKeyEventType:(WebEventType)type
++                           timeStamp:(CFTimeInterval)timestamp
++                          characters:(NSString*)characters
++         charactersIgnoringModifiers:(NSString*)charactersIgnoringModifiers
++                           modifiers:(WebEventFlags)modifiers
++                         isRepeating:(BOOL)isRepeating
++                           withFlags:(WebKeyboardInputFlags)flags
++                withInputManagerHint:(NSString*)hint
++                             keyCode:(uint16_t)keyCode
++                            isTabKey:(BOOL)isTabKey;
 +@property(nonatomic, readonly) WebEventType type;
 +@property(nonatomic, readonly) CFTimeInterval timestamp;
 +@property(nonatomic, readonly, retain) NSString* characters;
@@ -85,6 +97,8 @@ index 000000000000..d33a843ca0bc
 +  ~GeckoKeyboardSupport();
 +
 +  bool HandleKeyEvent(WebEvent* aEvent);
++  bool HandleKeyCommand(UIEvent* aEvent);
++  void SetKeyCommandDelegate(id<GeckoViewKeyCommandDelegate> aDelegate);
 +  void HandleModifierFlagsChanged(UIKeyModifierFlags aOldFlags,
 +                                  UIKeyModifierFlags aNewFlags);
 +  void ReleasePhysicalKey(uint16_t aNativeKeyCode);
@@ -117,6 +131,9 @@ index 000000000000..d33a843ca0bc
 +
 +  TextInputHandler* mHandler;
 +  nsTArray<UniquePtr<HeldKey>> mHeldKeys;
++  nsTArray<uint16_t> mShortcutKeys;
++  id<GeckoViewKeyCommandDelegate> mKeyCommandDelegate = nil;
++  NSMapTable<UIKeyCommand*, NSNumber*>* mPendingKeyCommands;
 +  CFRunLoopTimerRef mKeyRepeatTimer = nullptr;
 +  WebEvent* mRepeatingEvent = nil;
 +  Maybe<Command> mRepeatingCommand;

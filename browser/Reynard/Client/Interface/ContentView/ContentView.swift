@@ -302,7 +302,7 @@ final class ContentView: UIView, UIGestureRecognizerDelegate {
         bottomConstraint.isActive = true
         webContentBottomConstraint = bottomConstraint
         webContentView.extendPageBackground(from: topAnchor, to: bottomAnchor)
-        webContentView.positionErrorLabel(below: self.topAnchor)
+        webContentView.positionErrorView(from: topAnchor, to: bottomAnchor, viewport: self)
         webContentView.positionRefreshIndicator(below: self.topAnchor)
         [historyPreviewImageView, historyTransitionOverlayView].forEach { contentView in
             NSLayoutConstraint.activate([
@@ -562,10 +562,6 @@ final class ContentView: UIView, UIGestureRecognizerDelegate {
         webContentView.resetScrollTracking()
     }
     
-    func showPageError(for url: String?) {
-        webContentView.showPageError(for: url)
-    }
-    
     func didFinishLoading(session: GeckoSession) {
         webContentView.didFinishLoading(session: session)
     }
@@ -578,7 +574,24 @@ final class ContentView: UIView, UIGestureRecognizerDelegate {
         webContentView.restoreInteraction(for: session)
     }
     
+    // MARK: - Error Pages
+    
+    var onErrorAction: ((WebContentErrorView.Action) -> Void)? {
+        get { return webContentView.onErrorAction }
+        set { webContentView.onErrorAction = newValue }
+    }
+    
+    func updateLoadError(for tab: Tab?) {
+        webContentView.updateLoadError(for: tab)
+        updatePullToRefreshAvailability()
+    }
+    
     // MARK: - Interaction
+    
+    var keyCommandDelegate: GeckoViewKeyCommandDelegate? {
+        get { return webContentView.keyCommandDelegate }
+        set { webContentView.keyCommandDelegate = newValue }
+    }
     
     func addWebViewInteraction(_ interaction: UIInteraction) {
         webContentView.addWebViewInteraction(interaction)

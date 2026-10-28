@@ -55,6 +55,8 @@ final class UniversalLinkManager {
         in session: GeckoSession
     ) async -> AllowOrDeny {
         guard
+            // Handing a URL to a native app would load it outside Tor.
+            !Prefs.TorPreferences.enabled,
             Prefs.BrowsingSettings.openLinksInExternalApps,
             !session.isPrivateMode,
             request.isUserInitiatedNavigation,

@@ -50,22 +50,30 @@ final class BrowserUpdates: NSObject {
             return
         }
         
+        guard let url = URL(string: Self.sourceURL) else {
+            return
+        }
+        
         isFetching = true
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            guard let self,
-                  let url = URL(string: Self.sourceURL),
-                  let data = try? Data(contentsOf: url) else {
-                DispatchQueue.main.async {
-                    self?.isFetching = false
-                }
+        // Fetched through Gecko (and therefore Tor). A native
+        // Data(contentsOf:) request would resolve DNS and connect outside
+        // Tor, or be blocked by TorNativeNetworkGuard.
+        Task { @MainActor [weak self] in
+            guard let self else {
                 return
             }
+            defer { self.isFetching = false }
             
-            self.processUpdateFeed(data)
-            DispatchQueue.main.async {
-                self.isFetching = false
-                self.hasFetched = true
+            guard let fileURL = try? await TorFetcher.fetch(url) else {
+                return
             }
+            defer { try? FileManager.default.removeItem(at: fileURL) }
+            
+            guard let data = try? Data(contentsOf: fileURL) else {
+                return
+            }
+            self.processUpdateFeed(data)
+            self.hasFetched = true
         }
     }
     

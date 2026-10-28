@@ -48,7 +48,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         }
         
         browserViewController.stopScreenOrientationHandling()
-        browserViewController.tabManager.applicationWillResignActive()
         browserViewController.sessionManager.applicationWillResignActive()
     }
     

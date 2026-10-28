@@ -14,6 +14,7 @@
 #import "JITEnabler.h"
 #import "UIKit+Private.h"
 #import "Utils.h"
+#import "WebRequestErrorBridge.h"
 #import "GeckoViewSwiftSupport.h"
 #import "IOSBootstrap.h"
 

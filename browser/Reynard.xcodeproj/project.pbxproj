@@ -13,6 +13,7 @@
 		02WCPBF12F3000000000001 /* Reynard Helper.appex in Embed Process Extensions */ = {isa = PBXBuildFile; fileRef = 02WCPAPP2F3000000000001 /* Reynard Helper.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		03OLPBF12F3100000000001 /* OpenIn.appex in Embed Process Extensions */ = {isa = PBXBuildFile; fileRef = 03OLAPP2F3100000000001 /* OpenIn.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		560DF0B76178E0B518428197 /* IPtProxy in Frameworks */ = {isa = PBXBuildFile; productRef = 7363B7E0F4CCAA39836DF47C /* IPtProxy */; };
+		0A21DA010000000000000001 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 0A21DA010000000000000002 /* ZIPFoundation */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -174,6 +175,7 @@
 			files = (
 				01GECKO0012F2F289C001F0001 /* GeckoView.framework in Frameworks */,
 				560DF0B76178E0B518428197 /* IPtProxy in Frameworks */,
+				0A21DA010000000000000001 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -270,6 +272,7 @@
 			name = Reynard;
 			packageProductDependencies = (
 				7363B7E0F4CCAA39836DF47C /* IPtProxy */,
+				0A21DA010000000000000002 /* ZIPFoundation */,
 			);
 			productName = Reynard;
 			productReference = 018C679E2F2F289C001F0BBB /* Reynard.app */;
@@ -383,6 +386,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				05E556F42C945372BF54F2C1 /* XCRemoteSwiftPackageReference "IPtProxy" */,
+				0A21DA010000000000000003 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 018C679F2F2F289C001F0BBB /* Products */;
@@ -1111,6 +1115,14 @@
 				revision = 109119c4d386c1c563ed24aba93d3e6b813056f0;
 			};
 		};
+		0A21DA010000000000000003 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.9.20;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1118,6 +1130,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 05E556F42C945372BF54F2C1 /* XCRemoteSwiftPackageReference "IPtProxy" */;
 			productName = IPtProxy;
+		};
+		0A21DA010000000000000002 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A21DA010000000000000003 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

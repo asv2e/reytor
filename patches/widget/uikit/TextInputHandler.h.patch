@@ -1,8 +1,8 @@
 diff --git a/widget/uikit/TextInputHandler.h b/widget/uikit/TextInputHandler.h
-index 5073da48f88c..3ccee5b0e783 100644
+index 5073da48f88c..0ebbbfe54c2b 100644
 --- a/widget/uikit/TextInputHandler.h
 +++ b/widget/uikit/TextInputHandler.h
-@@ -8,13 +8,19 @@
+@@ -8,13 +8,20 @@
  #import <UIKit/UITextInput.h>
  
  #include "mozilla/EventForwards.h"
@@ -16,17 +16,20 @@ index 5073da48f88c..3ccee5b0e783 100644
  
  class nsWindow;
 +@class WebEvent;
++@protocol GeckoViewKeyCommandDelegate;
  
  namespace mozilla::widget {
 +class GeckoKeyboardSupport;
  class TextEventDispatcher;
  
  // This is the temporary input class. When implementing UITextInpt protocol, we
-@@ -36,29 +42,103 @@ class TextInputHandler final : public TextEventDispatcherListener {
+@@ -36,29 +43,106 @@ class TextInputHandler final : public TextEventDispatcherListener {
                              WidgetKeyboardEvent& aKeyboardEvent,
                              uint32_t aIndexOfKeypress, void* aData) override;
  
 +  bool HandleKeyEvent(WebEvent* aEvent);
++  bool HandleKeyCommand(UIEvent* aEvent);
++  void SetKeyCommandDelegate(id<GeckoViewKeyCommandDelegate> aDelegate);
 +  void HandleModifierFlagsChanged(UIKeyModifierFlags aOldFlags,
 +                                  UIKeyModifierFlags aNewFlags);
 +  void ReleasePhysicalKey(uint16_t aNativeKeyCode);
@@ -104,7 +107,8 @@ index 5073da48f88c..3ccee5b0e783 100644
 +  void MarkCurrentKeyEventFailed();
 +  bool DispatchPhysicalKeyDown(WebEvent* aEvent, bool aForceRepeat,
 +                               bool aHasCurrentNativeEvent,
-+                               Maybe<Command>& aCommand);
++                               Maybe<Command>& aCommand,
++                               bool* aPreventedByContent = nullptr);
 +  bool CancelMarkedText();
 +  void ClearCompositionState();
 +  bool HasMarkedText() const;

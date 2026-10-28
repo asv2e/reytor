@@ -41,6 +41,9 @@ enum NewIdentityController {
         browserViewController.tabManager.removeAllTabs(mode: .private)
         browserViewController.tabManager.createTab(selecting: true, mode: .regular)
         
+        // Closing tabs above may have filed them under "recently closed",
+        // which would let the old session be restored.
+        TabManagementStore.shared.clearRecentlyClosedTabs()
         HistoryStore.shared.clearVisits(since: nil)
         FaviconStore.shared.clearCache()
         

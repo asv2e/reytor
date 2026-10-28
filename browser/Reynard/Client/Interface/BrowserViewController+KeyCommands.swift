@@ -8,6 +8,35 @@
 import GeckoView
 import UIKit
 
+extension BrowserViewController: GeckoViewKeyCommandDelegate {
+    func keyCommand(forInput input: String, modifierFlags: UIKeyModifierFlags) -> UIKeyCommand? {
+        let modifiers = modifierFlags.intersection([.command, .control, .alternate, .shift])
+        guard let command = ApplicationMenuBuilder.keyCommands.first(where: {
+            guard $0.modifierFlags == modifiers else {
+                return false
+            }
+            
+            return $0.input?.caseInsensitiveCompare(input) == .orderedSame
+        }) else {
+            return nil
+        }
+        
+        guard hasSelectedWebPage || !shouldDispatchKeyCommandToContent(command) else {
+            return nil
+        }
+        
+        return command
+    }
+    
+    func shouldDispatchKeyCommandToContent(_ command: UIKeyCommand) -> Bool {
+        return command.action != #selector(focusAddressBarKeyCommand(_:))
+    }
+    
+    func contentDidHandleKeyCommand(_ command: UIKeyCommand) {
+        browserChrome.addressBar.showKeyCommandHint(command)
+    }
+}
+
 extension BrowserViewController {
     @objc func newTabKeyCommand(_ sender: UIKeyCommand) {
         createNewTab()

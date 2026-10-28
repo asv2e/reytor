@@ -144,9 +144,6 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
     
     deinit {
         stopScreenOrientationHandling()
-        if isShowingFullscreenMedia {
-            UIApplication.shared.isIdleTimerDisabled = false
-        }
         NotificationCenter.default.removeObserver(self)
     }
     
@@ -289,6 +286,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
     // MARK: - Browser Layout
     
     private func configureBrowserInterface() {
+        contentView.keyCommandDelegate = self
         contentView.onAppearanceChanged = { [weak self] in
             self?.setNeedsStatusBarAppearanceUpdate()
         }
@@ -335,6 +333,9 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         }
         contentView.onHistorySwipeBegan = { [weak self] in
             self?.captureOutgoingHistoryThumbnail()
+        }
+        contentView.onErrorAction = { [weak self] action in
+            self?.performErrorPageAction(action)
         }
         browserChrome.onSidebar = { [weak self] in
             self?.sidebarCoordinator.toggle(animated: true)
@@ -506,6 +507,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
                 self?.toolbarController.collapseBottomToolbar()
             } else {
                 self?.toolbarController.restoreBottomToolbar()
+                self?.requestContentKeyboardFocus()
             }
         }
         browserChrome.onKeyboardDismissal = { [weak self] in
@@ -839,6 +841,12 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         )
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(selectionSystemUIDidDismiss(_:)),
+            name: .selectionSystemUIDidDismiss,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(addressBarPositionDidChange),
             name: .addressBarPositionDidChange,
             object: nil
@@ -966,6 +974,17 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         return nil
     }
     
+    @objc private func selectionSystemUIDidDismiss(_ notification: Notification) {
+        guard let source = notification.object as? UIView,
+              let session = tabManager.selectedTab?.session,
+              let engineView = session.engineView,
+              source.isDescendant(of: engineView) else {
+            return
+        }
+        
+        requestContentKeyboardFocus(for: session)
+    }
+    
     @objc private func keyboardFrameWillChange(_ notification: Notification) {
         guard let frameValue = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else {
             return
@@ -996,6 +1015,12 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         && !browserChrome.isShowingFindInPage
         && (presentedController == nil || presentedController?.isBeingDismissed == true)
         
+        if shouldRelocateInput {
+            toolbarController.lock(for: .inputRelocation)
+        } else {
+            toolbarController.unlock(for: .inputRelocation)
+        }
+        
         let animation = keyboardAnimation(from: notification)
         if shouldRelocateInput && browserLayout.interfaceIdiom == .phone {
             browserChrome.showActionBar(.keyboardDismissal, animated: false)
@@ -1019,6 +1044,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
     }
     
     @objc private func keyboardWillHide(_ notification: Notification) {
+        toolbarController.unlock(for: .inputRelocation)
         let animation = keyboardAnimation(from: notification)
         if browserChrome.isShowingKeyboardDismissal {
             browserChrome.dismissActionBar(animated: false)
@@ -1087,7 +1113,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         )
     }
     
-    func applyFullscreenState(_ fullScreen: Bool, for session: GeckoSession?, mediaIsPlaying: Bool) {
+    func applyFullscreenState(_ fullScreen: Bool, for session: GeckoSession?) {
         if fullScreen {
             fullscreenSession = session
         } else if fullscreenSession === session || session == nil {
@@ -1109,7 +1135,6 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
         sidebarCoordinator.setFullscreen(fullScreen)
         isShowingFullscreenMedia = fullScreen
         updateBrowserLayout(animated: false)
-        UIApplication.shared.isIdleTimerDisabled = fullScreen && mediaIsPlaying
         updateFullscreenOrientation(fullScreen)
         requestContentKeyboardFocus(for: tabManager.selectedTab?.session)
     }
@@ -1120,7 +1145,7 @@ final class BrowserViewController: UIViewController, GeckoScreenOrientationDeleg
             return
         }
         session.exitFullScreen()
-        applyFullscreenState(false, for: session, mediaIsPlaying: false)
+        applyFullscreenState(false, for: session)
     }
     
     // MARK: - Orientation

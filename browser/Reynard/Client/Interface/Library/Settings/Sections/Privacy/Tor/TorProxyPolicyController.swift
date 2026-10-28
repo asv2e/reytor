@@ -40,6 +40,12 @@ enum TorProxyPolicyController {
             "network.proxy.failover_direct": false,
             "network.proxy.allow_bypass": false,
             
+            // Don't exempt localhost/127.0.0.1 from the proxy: otherwise a
+            // page can probe services on the device (including this app's
+            // own local SOCKS port) without going through Tor.
+            "network.proxy.no_proxies_on": "",
+            "network.proxy.allow_hijacking_localhost": true,
+            
             // Reduce opportunities for out-of-band DNS/network activity
             // that wouldn't go through the proxy.
             "network.dns.disablePrefetch": true,

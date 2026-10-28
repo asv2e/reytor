@@ -8,19 +8,10 @@
 import UIKit
 
 enum ApplicationMenuBuilder {
-    static func build(with builder: UIMenuBuilder) {
-        guard builder.system == UIMenuSystem.main else {
-            return
-        }
-        
-        builder.remove(menu: .close)
-        builder.remove(menu: .find)
-        builder.remove(menu: .textSize)
-        
-        if #available(iOS 15.0, *) {
-            builder.remove(menu: .sidebar)
-        }
-        
+    private static let commands: (
+        file: [UIKeyCommand], edit: [UIKeyCommand], view: [UIKeyCommand],
+        history: [UIKeyCommand], bookmarks: [UIKeyCommand], window: [UIKeyCommand]
+    ) = {
         let fileCommands = [
             UIKeyCommand(
                 title: NSLocalizedString("New Tab", comment: ""),
@@ -221,24 +212,47 @@ enum ApplicationMenuBuilder {
             ),
         ]
         
-        builder.insertChild(UIMenu(title: "", options: .displayInline, children: fileCommands), atEndOfMenu: .file)
-        builder.insertChild(UIMenu(title: "", options: .displayInline, children: editCommands), atEndOfMenu: .edit)
-        builder.insertChild(UIMenu(title: "", options: .displayInline, children: viewCommands), atEndOfMenu: .view)
+        return (
+            fileCommands, editCommands, viewCommands,
+            historyCommands, bookmarksCommands, windowCommands
+        )
+    }()
+    
+    static let keyCommands = commands.file + commands.edit + commands.view +
+    commands.history + commands.bookmarks + commands.window
+    
+    static func build(with builder: UIMenuBuilder) {
+        guard builder.system == UIMenuSystem.main else {
+            return
+        }
+        
+        builder.remove(menu: .preferences)
+        builder.remove(menu: .close)
+        builder.remove(menu: .find)
+        builder.remove(menu: .textSize)
+        
+        if #available(iOS 15.0, *) {
+            builder.remove(menu: .sidebar)
+        }
+        
+        builder.insertChild(UIMenu(title: "", options: .displayInline, children: commands.file), atEndOfMenu: .file)
+        builder.insertChild(UIMenu(title: "", options: .displayInline, children: commands.edit), atEndOfMenu: .edit)
+        builder.insertChild(UIMenu(title: "", options: .displayInline, children: commands.view), atEndOfMenu: .view)
         
         let historyMenu = UIMenu(
             title: NSLocalizedString("History", comment: ""),
             identifier: UIMenu.Identifier("com.minh-ton.Reynard.ApplicationMenu.History"),
-            children: historyCommands
+            children: commands.history
         )
         builder.insertSibling(historyMenu, beforeMenu: .window)
         
         let bookmarksMenu = UIMenu(
             title: NSLocalizedString("Bookmarks", comment: ""),
             identifier: UIMenu.Identifier("com.minh-ton.Reynard.ApplicationMenu.Bookmarks"),
-            children: bookmarksCommands
+            children: commands.bookmarks
         )
         builder.insertSibling(bookmarksMenu, afterMenu: historyMenu.identifier)
         
-        builder.insertChild(UIMenu(title: "", options: .displayInline, children: windowCommands), atEndOfMenu: .window)
+        builder.insertChild(UIMenu(title: "", options: .displayInline, children: commands.window), atEndOfMenu: .window)
     }
 }

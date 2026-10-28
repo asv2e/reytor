@@ -104,6 +104,24 @@ struct RunningClient {
 
 static RUNNING: Mutex<Option<RunningClient>> = Mutex::new(None);
 
+/// Hard cap on simultaneously proxied connections, and on how long a local
+/// client may take to finish the SOCKS handshake. Without these, a stalled or
+/// hostile local client could pile up tasks without bound.
+const MAX_CONCURRENT_CONNECTIONS: usize = 1024;
+const SOCKS_HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
+
+/// Upper bound on remembered per-host isolation tokens. Hostnames are
+/// page-controlled (any number of subdomains), so the map must not grow
+/// forever; when full it is simply reset, which only means affected hosts get
+/// fresh circuits.
+const MAX_ISOLATION_TOKENS: usize = 4096;
+
+/// Lower-cases and strips a trailing dot so `Example.com` and `example.com.`
+/// share one isolation token instead of silently splitting.
+fn normalize_host(host: &str) -> String {
+    host.trim().trim_end_matches('.').to_ascii_lowercase()
+}
+
 /// # Safety
 /// `state_dir`/`cache_dir` must be valid, NUL-terminated C strings for the
 /// duration of the call. `bridge_lines` must be either null (no bridges) or
@@ -147,6 +165,18 @@ pub unsafe extern "C" fn arti_start(
     };
 
     let mut running = RUNNING.lock().unwrap();
+    // A client whose thread already exited (bootstrap failure) must not
+    // block a retry.
+    let finished = running
+        .as_ref()
+        .map_or(false, |r| r.thread.as_ref().map_or(true, |t| t.is_finished()));
+    if finished {
+        if let Some(mut stale) = running.take() {
+            if let Some(thread) = stale.thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
     if running.is_some() {
         return -2;
     }
@@ -243,7 +273,11 @@ pub extern "C" fn arti_stop() {
 
 #[no_mangle]
 pub extern "C" fn arti_is_running() -> i32 {
-    RUNNING.lock().unwrap().is_some() as i32
+    RUNNING
+        .lock()
+        .unwrap()
+        .as_ref()
+        .map_or(false, |r| r.thread.as_ref().map_or(false, |t| !t.is_finished())) as i32
 }
 
 async fn run(
@@ -330,14 +364,20 @@ async fn run(
     // isolation.
     let isolation_tokens: Arc<Mutex<HashMap<String, IsolationToken>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let limiter = Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_CONNECTIONS));
 
     loop {
         tokio::select! {
             accepted = listener.accept() => {
                 if let Ok((stream, _addr)) = accepted {
+                    // Over the cap: drop the connection rather than queue it.
+                    let Ok(permit) = Arc::clone(&limiter).try_acquire_owned() else {
+                        continue;
+                    };
                     let client = client.clone();
                     let isolation_tokens = Arc::clone(&isolation_tokens);
                     tokio::spawn(async move {
+                        let _permit = permit;
                         let _ = handle_socks_connection(stream, client, isolation_tokens).await;
                     });
                 }
@@ -367,7 +407,7 @@ async fn run(
                         // set) without disturbing any other host's
                         // existing tokens/circuits or the shared client
                         // handle itself.
-                        isolation_tokens.lock().unwrap().insert(host, IsolationToken::new());
+                        isolation_tokens.lock().unwrap().insert(normalize_host(&host), IsolationToken::new());
                     }
                     Some(Command::Stop) | None => break,
                 }
@@ -384,7 +424,7 @@ fn build_config(
     bridge_lines: &str,
     obfs4_proxy_port: u16,
     snowflake_proxy_port: u16,
-) -> Result<TorClientConfig, arti_client::config::ConfigBuildError> {
+) -> Result<TorClientConfig, String> {
     let mut builder = TorClientConfig::builder();
     builder
         .storage()
@@ -410,6 +450,7 @@ fn build_config(
     // fine but get dropped below for lack of a usable proxy, same as any
     // other line this build can't service.
     let mut configured_bridges = 0;
+    let mut requested_bridge_lines = 0;
     let mut needs_obfs4 = false;
     let mut needs_snowflake = false;
     
@@ -418,6 +459,8 @@ fn build_config(
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
+        
+        requested_bridge_lines += 1;
         
         // A plain bridge line's second token is IP:PORT, not a transport
         // keyword, so this only matches on actual obfs4/snowflake lines.
@@ -453,6 +496,13 @@ fn build_config(
             Err(_) => continue,
         }
     }
+    // Fail closed: if the caller supplied bridge lines but none could be
+    // used (invalid, unsupported transport, or its proxy isn't running),
+    // Arti would otherwise quietly connect to public relays without
+    // bridges, exposing Tor use to the local network.
+    if requested_bridge_lines > 0 && configured_bridges == 0 {
+        return Err("bridges are enabled but none of the bridge lines could be used".to_owned());
+    }
     if configured_bridges > 0 {
         // BoolOrAuto's exact variant name wasn't independently confirmed
         // against this pin (unlike the other calls in this file) - verify
@@ -468,7 +518,7 @@ fn build_config(
         register_unmanaged_transport(&mut builder, "snowflake", snowflake_proxy_port);
     }
     
-    builder.build()
+    builder.build().map_err(|e| e.to_string())
 }
 
 /// Registers a locally-running (IPtProxy) pluggable transport with arti as
@@ -505,20 +555,13 @@ fn register_unmanaged_transport(
     builder.bridges().transports().push(transport);
 }
 
-/// Minimal SOCKS5 server: no-auth only, CONNECT command only, forwards the
-/// resulting stream through the Tor client. Domain-name targets are passed
-/// straight through to `TorClient::connect` so DNS resolution happens on
-/// the Tor side (this matters - it's the whole point of setting
-/// `network.proxy.socks_remote_dns` on the Gecko side).
-async fn handle_socks_connection(
-    mut stream: TcpStream,
-    client: TorClient<PreferredRuntime>,
-    isolation_tokens: Arc<Mutex<HashMap<String, IsolationToken>>>,
-) -> std::io::Result<()> {
+/// Reads the SOCKS5 greeting and CONNECT request. Returns `Ok(None)` when the
+/// client was rejected (a reply has already been sent where applicable).
+async fn socks_handshake(stream: &mut TcpStream) -> std::io::Result<Option<(String, u16)>> {
     let mut greeting = [0u8; 2];
     stream.read_exact(&mut greeting).await?;
     if greeting[0] != 0x05 {
-        return Ok(());
+        return Ok(None);
     }
     let mut methods = vec![0u8; greeting[1] as usize];
     stream.read_exact(&mut methods).await?;
@@ -530,7 +573,7 @@ async fn handle_socks_connection(
     if head[0] != 0x05 || head[1] != 0x01 {
         // Unsupported version or command (only CONNECT is implemented).
         stream.write_all(&[0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await?;
-        return Ok(());
+        return Ok(None);
     }
 
     let target = match head[3] {
@@ -559,8 +602,28 @@ async fn handle_socks_connection(
         }
         _ => {
             stream.write_all(&[0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await?;
-            return Ok(());
+            return Ok(None);
         }
+    };
+    Ok(Some(target))
+}
+
+/// Minimal SOCKS5 server: no-auth only, CONNECT command only, forwards the
+/// resulting stream through the Tor client. Domain-name targets are passed
+/// straight through to `TorClient::connect` so DNS resolution happens on
+/// the Tor side (this matters - it's the whole point of setting
+/// `network.proxy.socks_remote_dns` on the Gecko side).
+async fn handle_socks_connection(
+    mut stream: TcpStream,
+    client: TorClient<PreferredRuntime>,
+    isolation_tokens: Arc<Mutex<HashMap<String, IsolationToken>>>,
+) -> std::io::Result<()> {
+    let target = match tokio::time::timeout(SOCKS_HANDSHAKE_TIMEOUT, socks_handshake(&mut stream)).await {
+        Ok(Ok(Some(target))) => target,
+        Ok(Ok(None)) => return Ok(()),
+        Ok(Err(e)) => return Err(e),
+        // Handshake stalled: drop the connection.
+        Err(_) => return Ok(()),
     };
 
     match client.connect_with_prefs((target.0.as_str(), target.1), &stream_prefs_for(&target.0, &isolation_tokens)).await {
@@ -598,8 +661,12 @@ fn stream_prefs_for(
     isolation_tokens: &Arc<Mutex<HashMap<String, IsolationToken>>>,
 ) -> StreamPrefs {
     let mut tokens = isolation_tokens.lock().unwrap();
+    let key = normalize_host(hostname);
+    if tokens.len() >= MAX_ISOLATION_TOKENS && !tokens.contains_key(&key) {
+        tokens.clear();
+    }
     let token = tokens
-        .entry(hostname.to_owned())
+        .entry(key)
         .or_insert_with(IsolationToken::new)
         .clone();
     

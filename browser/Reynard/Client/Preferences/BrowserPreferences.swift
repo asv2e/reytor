@@ -159,7 +159,7 @@ final class BrowserPreferences {
             key("TrackingProtection", "globalPrivacyControlEnabled"): false,
             
             // Fingerprinting Protection
-            key("FingerprintingProtection", "enabled"): false,
+            key("FingerprintingProtection", "enabled"): true,
             key("FingerprintingProtection", "letterboxingEnabled"): true,
             key("FingerprintingProtection", "blocksWebRTC"): true,
             key("FingerprintingProtection", "spoofsAcceptLanguage"): true,
@@ -174,7 +174,7 @@ final class BrowserPreferences {
             key("AntiXSS", "enabled"): true,
             
             // Website Isolation
-            key("WebsiteIsolation", "enabled"): false,
+            key("WebsiteIsolation", "enabled"): true,
             
             // Amnesic Mode
             key("Amnesic", "enabled"): false,
