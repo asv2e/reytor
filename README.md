@@ -206,4 +206,4 @@ If you’ve come across this repository and find it interesting, I’d love to g
 
 ## License
 
-This project is licensed under the [GNU General Public License v3.0](https://github.com/asv2e/Reytor/blob/main/LICENSE), except for the `patches`and `support/arti-ffi` directories containing the modifications to the Firefox Gecko engine and therefore is licensed under the [Mozilla Public License 2.0](https://github.com/asv2e/Reytor/blob/main/LICENSE.firefox).
+This project is licensed under the [GNU General Public License v3.0](https://github.com/asv2e/Reytor/blob/main/LICENSE), except for the `patches` directory containing the modifications to the Firefox Gecko engine and therefore is licensed under the [Mozilla Public License 2.0](https://github.com/asv2e/Reytor/blob/main/LICENSE.firefox).
