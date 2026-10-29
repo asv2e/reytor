@@ -27,7 +27,9 @@ jobs:
           xcode-version: '26.6'
 
       - name: Install native build dependencies
-        run: brew install cmake nasm yasm pkg-config sccache
+        run: |
+          brew install cmake nasm yasm pkg-config sccache lld
+          echo "$(brew --prefix lld)/bin" >> "$GITHUB_PATH"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -49,6 +51,8 @@ jobs:
           
       - name: Build Gecko
         shell: bash
+        env:
+          LD: ld64.lld
         run: |
           ./tools/development/build-gecko.sh
 
